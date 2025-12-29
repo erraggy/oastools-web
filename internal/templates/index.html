@@ -1,0 +1,48 @@
+{{template "base" .}}
+
+{{define "title"}}oastools - OpenAPI Toolkit{{end}}
+
+{{define "content"}}
+<section class="hero">
+    <h1>OpenAPI Toolkit</h1>
+    <p>Validate, convert, diff, fix, and join OpenAPI specifications directly in your browser.</p>
+</section>
+
+<section class="operations">
+    <div class="card">
+        <h2>Validate</h2>
+        <p>Check your OpenAPI specification for errors and warnings with detailed feedback.</p>
+        <a href="/validate" class="btn">Validate Spec</a>
+    </div>
+
+    <div class="card">
+        <h2>Convert</h2>
+        <p>Convert between OpenAPI versions: 2.0, 3.0, 3.1, and 3.2.</p>
+        <a href="/convert" class="btn">Convert Spec</a>
+    </div>
+
+    <div class="card">
+        <h2>Diff</h2>
+        <p>Compare two specifications and identify breaking changes.</p>
+        <a href="/diff" class="btn">Compare Specs</a>
+    </div>
+
+    <div class="card">
+        <h2>Fix</h2>
+        <p>Automatically fix common issues in your OpenAPI specification.</p>
+        <a href="/fix" class="btn">Fix Spec</a>
+    </div>
+
+    <div class="card">
+        <h2>Join</h2>
+        <p>Merge multiple OpenAPI specifications into a single document.</p>
+        <a href="/join" class="btn">Join Specs</a>
+    </div>
+
+    <div class="card">
+        <h2>Overlay</h2>
+        <p>Apply OpenAPI Overlay transformations to your specification.</p>
+        <a href="/overlay" class="btn">Apply Overlay</a>
+    </div>
+</section>
+{{end}}
