@@ -1,0 +1,9 @@
+{{define "error"}}
+<div class="error-message">
+    <h3>Error</h3>
+    <p>{{.Message}}</p>
+    {{if .Details}}
+    <pre>{{.Details}}</pre>
+    {{end}}
+</div>
+{{end}}
