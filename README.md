@@ -6,4 +6,4 @@ The application itself is built using oastools' `builder.ServerBuilder`, serving
 
 ## Status
 
-🚧 **Work in progress** - Currently in the planning phase. See the `planning/` directory for implementation details.
+🚧 **Work in progress** - Currently in the planning phase.
