@@ -6,3 +6,6 @@ go.work.sum
 
 # Build artifacts
 bin/
+
+# Local planning docs
+planning/
