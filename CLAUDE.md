@@ -8,6 +8,30 @@ oastools-web is a public web application demonstrating the oastools Go toolkit. 
 
 The main `oastools` library repo is located at `~/code/oastools` (sibling directory).
 
+## Development Workflow
+
+### Branch Strategy
+- Create a working branch from latest `main` before making any changes
+- Branch naming: `<category>/<kebab-case-subject>`
+- Categories: `feat`, `fix`, `chore`, `doc`, `ci`, `refactor`, `test`
+- Examples: `feat/project-foundation`, `fix/rate-limiter-cleanup`
+
+### Commit Conventions
+- Conventional commits format
+- Subject line: max 72 characters
+- Body: GitHub-flavored markdown with subheadings
+
+```
+feat: add validation endpoint handler
+
+## Changes
+- Add POST /api/validate handler
+- Implement multipart file parsing
+
+## Reasoning
+Establishes the pattern for all subsequent operation handlers.
+```
+
 ## Build Commands
 
 ```bash
