@@ -1,8 +1,11 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
 	"net/http"
+	"runtime/debug"
+
+	"github.com/erraggy/oastools/builder"
 )
 
 // HealthResponse represents the health check response.
@@ -12,13 +15,26 @@ type HealthResponse struct {
 	OASTools string `json:"oastools"`
 }
 
-func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
-	resp := HealthResponse{
+func (h *Handler) handleHealth(_ context.Context, _ *builder.Request) builder.Response {
+	return builder.JSON(http.StatusOK, HealthResponse{
 		Status:   "healthy",
 		Version:  h.version,
-		OASTools: "1.33.0", // TODO: get from oastools package if exposed
+		OASTools: getOASToolsVersion(),
+	})
+}
+
+// getOASToolsVersion returns the oastools module version from build info.
+func getOASToolsVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	for _, dep := range info.Deps {
+		if dep.Path == "github.com/erraggy/oastools" {
+			return dep.Version
+		}
+	}
+
+	return "unknown"
 }

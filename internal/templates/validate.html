@@ -1,0 +1,28 @@
+{{template "base" .}}
+
+{{define "title"}}Validate - oastools{{end}}
+
+{{define "content"}}
+<section class="operation-page">
+    <h1>Validate OpenAPI Specification</h1>
+    <p>Check your specification for errors and warnings with detailed feedback.</p>
+
+    <form hx-post="/api/validate"
+          hx-target="#result"
+          hx-indicator="#spinner"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="spec">Specification File</label>
+            <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" required>
+            <small>Accepts JSON or YAML files up to 2MB</small>
+        </div>
+        <button type="submit" class="btn">
+            Validate
+            <span id="spinner" class="spinner htmx-indicator"></span>
+        </button>
+    </form>
+
+    <div id="result"></div>
+</section>
+{{end}}

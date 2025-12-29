@@ -1,0 +1,58 @@
+{{define "validation-result.html"}}
+<div class="result">
+    <div class="result-header">
+        <h2>Validation Result</h2>
+        {{if .Valid}}
+        <span class="badge badge-success">Valid</span>
+        {{else}}
+        <span class="badge badge-error">Invalid</span>
+        {{end}}
+    </div>
+
+    <p class="version-info">OpenAPI Version: <strong>{{.Version}}</strong></p>
+
+    {{if .Errors}}
+    <div class="issues-section">
+        <h3>Errors ({{len .Errors}})</h3>
+        <ul class="issue-list">
+            {{range .Errors}}
+            <li class="issue-item issue-error">
+                <code class="issue-path">{{.Path}}</code>
+                <p class="issue-message">{{.Message}}</p>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+
+    {{if .Warnings}}
+    <div class="issues-section">
+        <h3>Warnings ({{len .Warnings}})</h3>
+        <ul class="issue-list">
+            {{range .Warnings}}
+            <li class="issue-item issue-warning">
+                <code class="issue-path">{{.Path}}</code>
+                <p class="issue-message">{{.Message}}</p>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+
+    {{if and (not .Errors) (not .Warnings)}}
+    <p class="success-message">No issues found. Your specification is valid.</p>
+    {{end}}
+
+    <div class="stats-section">
+        <h3>Statistics</h3>
+        <dl class="stats-grid">
+            <dt>Paths</dt>
+            <dd>{{.Statistics.Paths}}</dd>
+            <dt>Operations</dt>
+            <dd>{{.Statistics.Operations}}</dd>
+            <dt>Schemas</dt>
+            <dd>{{.Statistics.Schemas}}</dd>
+        </dl>
+    </div>
+</div>
+{{end}}
