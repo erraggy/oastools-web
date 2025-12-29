@@ -48,6 +48,7 @@ func main() {
 		defer cancel()
 
 		slog.Info("shutting down server")
+		handler.Stop() // Stop background goroutines
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("shutdown error", "error", err)
 		}
