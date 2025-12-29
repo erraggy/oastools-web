@@ -2,15 +2,14 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/joiner"
 	"github.com/erraggy/oastools/parser"
-	"go.yaml.in/yaml/v4"
 )
 
 // JoinResponse represents the join result.
@@ -23,9 +22,13 @@ type JoinResponse struct {
 	Format         string   `json:"format"`
 }
 
+// maxJoinFileSize is the maximum size for each file in a join operation (1MB).
+const maxJoinFileSize = 1024 * 1024
+
 func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Response {
-	// Parse multipart form - allow up to 5 files at 1MB each
-	if err := req.HTTPRequest.ParseMultipartForm(5 * h.cfg.MaxFileSize); err != nil {
+	// Parse multipart form - allow up to 5 files at 1MB each (5MB total)
+	const joinMaxSize = 5 * maxJoinFileSize
+	if err := req.HTTPRequest.ParseMultipartForm(joinMaxSize); err != nil {
 		return builder.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: ErrorDetail{
 				Code:    "FORM_PARSE_FAILED",
@@ -78,6 +81,16 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 			})
 		}
 
+		// Validate per-file size limit (1MB)
+		if len(content) > maxJoinFileSize {
+			return builder.JSON(http.StatusBadRequest, ErrorResponse{
+				Error: ErrorDetail{
+					Code:    "FILE_TOO_LARGE",
+					Message: fmt.Sprintf("file %s exceeds 1MB limit", fileHeader.Filename),
+				},
+			})
+		}
+
 		// Track format from first file
 		if i == 0 {
 			firstFormat = detectFormat(content)
@@ -112,15 +125,22 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 	}
 
 	// Serialize result in first file's format
-	var output []byte
-	if firstFormat == "json" {
-		output, _ = json.MarshalIndent(joinResult.Document, "", "  ")
-	} else {
-		output, _ = yaml.Marshal(joinResult.Document)
+	output, err := serializeDocument(joinResult.Document, firstFormat)
+	if err != nil {
+		slog.Error("failed to serialize join result",
+			"error", err,
+			"format", firstFormat,
+		)
+		return builder.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "SERIALIZATION_FAILED",
+				Message: "failed to serialize joined specification",
+			},
+		})
 	}
 
 	// Build response
-	result := h.buildJoinResponse(parseResults, joinResult, string(output), firstFormat)
+	result := h.buildJoinResponse(parseResults, joinResult, output, firstFormat)
 
 	// Content negotiation
 	if wantsHTML(req.HTTPRequest) {

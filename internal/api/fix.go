@@ -2,15 +2,13 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/fixer"
 	"github.com/erraggy/oastools/parser"
-	"go.yaml.in/yaml/v4"
 )
 
 // FixResponse represents the fix result.
@@ -30,26 +28,11 @@ type FixEntry struct {
 
 func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Response {
 	// Get file from multipart form
-	file, _, err := req.HTTPRequest.FormFile("spec")
-	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "MISSING_FILE",
-				Message: "spec file is required",
-			},
-		})
+	content, file, errResp := readFormFile(req.HTTPRequest, "spec")
+	if errResp != nil {
+		return errResp
 	}
 	defer file.Close()
-
-	content, err := io.ReadAll(file)
-	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "READ_FAILED",
-				Message: fmt.Sprintf("failed to read file: %v", err),
-			},
-		})
-	}
 
 	// Parse using oastools
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
@@ -66,9 +49,8 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	f := fixer.New()
 
 	// EnabledFixes controls which fix types to apply
-	// Default is only FixTypeMissingPathParameter for performance
 	// Setting to nil enables all fix types
-	enabledFixes := []fixer.FixType{}
+	var enabledFixes []fixer.FixType
 
 	// Add fix types based on checkboxes
 	if req.HTTPRequest.FormValue("fixMissingParams") == "on" {
@@ -84,10 +66,8 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 		enabledFixes = append(enabledFixes, fixer.FixTypePrunedEmptyPath)
 	}
 
-	// If no checkboxes selected, enable all fixes
-	if len(enabledFixes) == 0 {
-		f.EnabledFixes = nil // nil enables all fix types
-	} else {
+	// If checkboxes selected, use only those fix types; otherwise nil enables all
+	if len(enabledFixes) > 0 {
 		f.EnabledFixes = enabledFixes
 	}
 
@@ -104,15 +84,22 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 
 	// Serialize result in original format
 	format := detectFormat(content)
-	var output []byte
-	if format == "json" {
-		output, _ = json.MarshalIndent(fixResult.Document, "", "  ")
-	} else {
-		output, _ = yaml.Marshal(fixResult.Document)
+	output, err := serializeDocument(fixResult.Document, format)
+	if err != nil {
+		slog.Error("failed to serialize fix result",
+			"error", err,
+			"format", format,
+		)
+		return builder.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "SERIALIZATION_FAILED",
+				Message: "failed to serialize fixed specification",
+			},
+		})
 	}
 
 	// Build response
-	result := h.buildFixResponse(parseResult, fixResult, string(output), format)
+	result := h.buildFixResponse(parseResult, fixResult, output, format)
 
 	// Content negotiation
 	if wantsHTML(req.HTTPRequest) {

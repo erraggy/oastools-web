@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -33,7 +34,10 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		return nil, err
 	}
 
-	staticSub, _ := fs.Sub(static.FS, ".")
+	staticSub, err := fs.Sub(static.FS, ".")
+	if err != nil {
+		return nil, fmt.Errorf("failed to access static files: %w", err)
+	}
 
 	h := &Handler{
 		cfg:         cfg,
@@ -139,6 +143,11 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := h.templates.ExecuteTemplate(w, templateName, data); err != nil {
+		slog.Error("page template execution failed",
+			"template", templateName,
+			"path", r.URL.Path,
+			"error", err,
+		)
 		http.Error(w, "template error", http.StatusInternalServerError)
 	}
 }

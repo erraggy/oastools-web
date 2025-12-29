@@ -2,15 +2,13 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/overlay"
 	"github.com/erraggy/oastools/parser"
-	"go.yaml.in/yaml/v4"
 )
 
 // OverlayResponse represents the overlay application result.
@@ -30,47 +28,30 @@ type OverlayChange struct {
 	MatchCount int    `json:"matchCount"`
 }
 
+// maxOverlaySize is the maximum size for overlay files (500KB).
+const maxOverlaySize = 500 * 1024
+
 func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder.Response {
 	// Get spec file from multipart form
-	specFile, _, err := req.HTTPRequest.FormFile("spec")
-	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "MISSING_FILE",
-				Message: "spec file is required",
-			},
-		})
+	specContent, specFile, errResp := readFormFile(req.HTTPRequest, "spec")
+	if errResp != nil {
+		return errResp
 	}
 	defer specFile.Close()
 
-	specContent, err := io.ReadAll(specFile)
-	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "READ_FAILED",
-				Message: fmt.Sprintf("failed to read spec file: %v", err),
-			},
-		})
-	}
-
 	// Get overlay file from multipart form
-	overlayFile, _, err := req.HTTPRequest.FormFile("overlay")
-	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "MISSING_FILE",
-				Message: "overlay file is required",
-			},
-		})
+	overlayContent, overlayFile, errResp := readFormFile(req.HTTPRequest, "overlay")
+	if errResp != nil {
+		return errResp
 	}
 	defer overlayFile.Close()
 
-	overlayContent, err := io.ReadAll(overlayFile)
-	if err != nil {
+	// Validate overlay file size (500KB limit)
+	if len(overlayContent) > maxOverlaySize {
 		return builder.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: ErrorDetail{
-				Code:    "READ_FAILED",
-				Message: fmt.Sprintf("failed to read overlay file: %v", err),
+				Code:    "FILE_TOO_LARGE",
+				Message: "overlay file exceeds 500KB limit",
 			},
 		})
 	}
@@ -111,15 +92,22 @@ func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder
 
 	// Serialize result in original format
 	format := detectFormat(specContent)
-	var output []byte
-	if format == "json" {
-		output, _ = json.MarshalIndent(applyResult.Document, "", "  ")
-	} else {
-		output, _ = yaml.Marshal(applyResult.Document)
+	output, err := serializeDocument(applyResult.Document, format)
+	if err != nil {
+		slog.Error("failed to serialize overlay result",
+			"error", err,
+			"format", format,
+		)
+		return builder.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "SERIALIZATION_FAILED",
+				Message: "failed to serialize overlay result",
+			},
+		})
 	}
 
 	// Build response
-	result := h.buildOverlayResponse(parseResult, applyResult, string(output), format)
+	result := h.buildOverlayResponse(parseResult, applyResult, output, format)
 
 	// Content negotiation
 	if wantsHTML(req.HTTPRequest) {

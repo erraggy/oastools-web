@@ -2,15 +2,13 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/converter"
 	"github.com/erraggy/oastools/parser"
-	"go.yaml.in/yaml/v4"
 )
 
 // ConvertResponse represents the conversion result.
@@ -30,26 +28,11 @@ type ConversionIssue struct {
 
 func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder.Response {
 	// Get file from multipart form
-	file, _, err := req.HTTPRequest.FormFile("spec")
-	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "MISSING_FILE",
-				Message: "spec file is required",
-			},
-		})
+	content, file, errResp := readFormFile(req.HTTPRequest, "spec")
+	if errResp != nil {
+		return errResp
 	}
 	defer file.Close()
-
-	content, err := io.ReadAll(file)
-	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "READ_FAILED",
-				Message: fmt.Sprintf("failed to read file: %v", err),
-			},
-		})
-	}
 
 	// Get target version
 	targetVersion := req.HTTPRequest.FormValue("target")
@@ -87,15 +70,22 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 
 	// Serialize result in preferred format
 	format := detectFormat(content)
-	var output []byte
-	if format == "json" {
-		output, _ = json.MarshalIndent(convertResult.Document, "", "  ")
-	} else {
-		output, _ = yaml.Marshal(convertResult.Document)
+	output, err := serializeDocument(convertResult.Document, format)
+	if err != nil {
+		slog.Error("failed to serialize conversion result",
+			"error", err,
+			"format", format,
+		)
+		return builder.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error: ErrorDetail{
+				Code:    "SERIALIZATION_FAILED",
+				Message: "failed to serialize converted specification",
+			},
+		})
 	}
 
 	// Build response
-	result := h.buildConvertResponse(parseResult, targetVersion, convertResult, string(output), format)
+	result := h.buildConvertResponse(parseResult, targetVersion, convertResult, output, format)
 
 	// Content negotiation
 	if wantsHTML(req.HTTPRequest) {
