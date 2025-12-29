@@ -16,6 +16,11 @@ The main `oastools` library repo is located at `~/code/oastools` (sibling direct
 - Categories: `feat`, `fix`, `chore`, `doc`, `ci`, `refactor`, `test`
 - Examples: `feat/project-foundation`, `fix/rate-limiter-cleanup`
 
+### Merging PRs
+- Branch protections require review approval to merge
+- Since the repo owner cannot self-review, use `gh pr merge --admin --squash` for owner PRs
+- Remote branches auto-delete on merge; only local branch cleanup needed
+
 ### Commit Conventions
 - Conventional commits format
 - Subject line: max 72 characters
