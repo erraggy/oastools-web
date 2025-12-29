@@ -1,0 +1,61 @@
+{{define "convert-result.html"}}
+<div class="result">
+    <div class="result-header">
+        <h2>Conversion Result</h2>
+        <span class="badge badge-success">Converted</span>
+    </div>
+
+    <p class="version-info">
+        <strong>{{.SourceVersion}}</strong> &rarr; <strong>{{.TargetVersion}}</strong>
+    </p>
+
+    {{if .Issues}}
+    <div class="issues-section">
+        <h3>Conversion Notes ({{len .Issues}})</h3>
+        <ul class="issue-list">
+            {{range .Issues}}
+            <li class="issue-item issue-warning">
+                <code class="issue-path">{{.Path}}</code>
+                <p class="issue-message">{{.Message}}</p>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+
+    <div class="output-section">
+        <div class="output-header">
+            <h3>Converted Specification</h3>
+            <div class="output-actions">
+                <button type="button" class="btn btn-small" onclick="copyToClipboard()">Copy</button>
+                <button type="button" class="btn btn-small" onclick="downloadSpec()">Download</button>
+            </div>
+        </div>
+        <pre class="code-output"><code id="spec-output">{{.Result}}</code></pre>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const text = document.getElementById('spec-output').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
+
+function downloadSpec() {
+    const text = document.getElementById('spec-output').textContent;
+    const format = '{{.Format}}';
+    const ext = format === 'json' ? 'json' : 'yaml';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'converted-spec.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+</script>
+{{end}}

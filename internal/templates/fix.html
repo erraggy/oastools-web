@@ -1,0 +1,51 @@
+{{template "base" .}}
+
+{{define "title"}}Fix - oastools{{end}}
+
+{{define "content"}}
+<section class="operation-page">
+    <h1>Fix OpenAPI Specification</h1>
+    <p>Automatically fix common issues in your OpenAPI specification.</p>
+
+    <form hx-post="/api/fix"
+          hx-target="#result"
+          hx-indicator="#spinner"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="spec">Specification File</label>
+            <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" required>
+            <small>Accepts JSON or YAML files up to 2MB</small>
+        </div>
+
+        <div class="form-group">
+            <label>Fix Options (leave unchecked to enable all)</label>
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="fixMissingParams">
+                    Add missing path parameters
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="removeUnusedSchemas">
+                    Remove unused schemas
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="fixInvalidNames">
+                    Fix invalid schema names
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="pruneEmptyPaths">
+                    Remove empty paths
+                </label>
+            </div>
+        </div>
+
+        <button type="submit" class="btn">
+            Fix Specification
+            <span id="spinner" class="spinner htmx-indicator"></span>
+        </button>
+    </form>
+
+    <div id="result"></div>
+</section>
+{{end}}

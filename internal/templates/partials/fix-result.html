@@ -1,0 +1,66 @@
+{{define "fix-result.html"}}
+<div class="result">
+    <div class="result-header">
+        <h2>Fix Result</h2>
+        {{if .Fixes}}
+        <span class="badge badge-success">{{len .Fixes}} fixes applied</span>
+        {{else}}
+        <span class="badge badge-info">No fixes needed</span>
+        {{end}}
+    </div>
+
+    <p class="version-info">OpenAPI Version: <strong>{{.Version}}</strong></p>
+
+    {{if .Fixes}}
+    <div class="issues-section">
+        <h3>Applied Fixes ({{len .Fixes}})</h3>
+        <ul class="issue-list">
+            {{range .Fixes}}
+            <li class="issue-item issue-success">
+                <code class="issue-path">{{.Path}}</code>
+                <p class="issue-message">{{.Description}}</p>
+                <span class="fix-type">{{.Type}}</span>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{else}}
+    <p class="success-message">Your specification had no issues that required fixing.</p>
+    {{end}}
+
+    <div class="output-section">
+        <div class="output-header">
+            <h3>Fixed Specification</h3>
+            <div class="output-actions">
+                <button type="button" class="btn btn-small" onclick="copyToClipboard()">Copy</button>
+                <button type="button" class="btn btn-small" onclick="downloadSpec()">Download</button>
+            </div>
+        </div>
+        <pre class="code-output"><code id="spec-output">{{.Result}}</code></pre>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const text = document.getElementById('spec-output').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
+
+function downloadSpec() {
+    const text = document.getElementById('spec-output').textContent;
+    const format = '{{.Format}}';
+    const ext = format === 'json' ? 'json' : 'yaml';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fixed-spec.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+</script>
+{{end}}

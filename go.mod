@@ -1,6 +1,8 @@
 module github.com/erraggy/oastools-web
 
-go 1.25
+go 1.24.0
+
+toolchain go1.24.7
 
 require (
 	github.com/erraggy/oastools v1.35.0

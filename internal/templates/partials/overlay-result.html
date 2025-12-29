@@ -1,0 +1,74 @@
+{{define "overlay-result.html"}}
+<div class="result">
+    <div class="result-header">
+        <h2>Overlay Result</h2>
+        {{if gt .ActionsApplied 0}}
+        <span class="badge badge-success">{{.ActionsApplied}} actions applied</span>
+        {{else}}
+        <span class="badge badge-info">No actions applied</span>
+        {{end}}
+    </div>
+
+    <p class="version-info">OpenAPI Version: <strong>{{.Version}}</strong></p>
+
+    {{if gt .ActionsSkipped 0}}
+    <p class="warning-message">{{.ActionsSkipped}} actions were skipped (no matches).</p>
+    {{end}}
+
+    {{if .Changes}}
+    <div class="issues-section">
+        <h3>Applied Changes ({{len .Changes}})</h3>
+        <ul class="issue-list">
+            {{range .Changes}}
+            <li class="issue-item issue-success">
+                <div class="action-header">
+                    <span class="action-type action-type-{{.Operation}}">{{.Operation}}</span>
+                    <code class="issue-path">{{.Target}}</code>
+                </div>
+                {{if gt .MatchCount 0}}
+                <small>{{.MatchCount}} nodes matched</small>
+                {{end}}
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{else}}
+    <p class="success-message">No overlay actions matched any targets in the specification.</p>
+    {{end}}
+
+    <div class="output-section">
+        <div class="output-header">
+            <h3>Modified Specification</h3>
+            <div class="output-actions">
+                <button type="button" class="btn btn-small" onclick="copyToClipboard()">Copy</button>
+                <button type="button" class="btn btn-small" onclick="downloadSpec()">Download</button>
+            </div>
+        </div>
+        <pre class="code-output"><code id="spec-output">{{.Result}}</code></pre>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const text = document.getElementById('spec-output').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
+
+function downloadSpec() {
+    const text = document.getElementById('spec-output').textContent;
+    const format = '{{.Format}}';
+    const ext = format === 'json' ? 'json' : 'yaml';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'overlay-result.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+</script>
+{{end}}
