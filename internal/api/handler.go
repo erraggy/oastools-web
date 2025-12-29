@@ -49,7 +49,10 @@ func (h *Handler) buildMiddlewareChain() {
 	// Timeout
 	handler = Timeout(h.cfg.RequestTimeout)(handler)
 
-	// Rate limiting
+	// Concurrency limit (global)
+	handler = ConcurrencyLimiter(h.cfg.MaxConcurrentRequests)(handler)
+
+	// Rate limiting (per-IP)
 	handler = h.rateLimiter.Middleware(handler)
 
 	// Recovery (catches panics)
@@ -59,6 +62,11 @@ func (h *Handler) buildMiddlewareChain() {
 	handler = Logging(handler)
 
 	h.handler = handler
+}
+
+// Stop performs cleanup for graceful shutdown.
+func (h *Handler) Stop() {
+	h.rateLimiter.Stop()
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

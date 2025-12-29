@@ -60,7 +60,7 @@ static/               # CSS and minimal JS
 
 ### Request Flow
 1. Cloud Run receives request
-2. Middleware chain: rate limit → timeout → recovery → size limit → logging
+2. Middleware chain: logging → recovery → rate limit → concurrency → timeout → size limit
 3. Handler parses multipart upload, calls oastools library
 4. Template renders HTML partial (HTMX) or JSON (Accept header)
 
@@ -85,6 +85,7 @@ Environment variables:
 - `RATE_LIMIT_RPM` - requests per minute per IP (default: 10)
 - `MAX_FILE_SIZE` - max upload bytes (default: 2MB)
 - `REQUEST_TIMEOUT` - processing timeout (default: 30s)
+- `MAX_CONCURRENT_REQUESTS` - global concurrent request limit (default: 10)
 
 ## Security Constraints
 
