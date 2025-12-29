@@ -1,11 +1,18 @@
 package api
 
 import (
+	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
+	"strings"
 
 	"github.com/erraggy/oastools-web/internal/config"
 	"github.com/erraggy/oastools-web/internal/templates"
+	"github.com/erraggy/oastools-web/static"
+
+	"github.com/erraggy/oastools/builder"
+	"github.com/erraggy/oastools/parser"
 )
 
 // Handler is the main HTTP handler for the application.
@@ -13,9 +20,10 @@ type Handler struct {
 	cfg         *config.Config
 	version     string
 	templates   *template.Template
-	mux         *http.ServeMux
 	rateLimiter *RateLimiter
+	server      *builder.ServerResult
 	handler     http.Handler
+	staticFS    http.Handler
 }
 
 // NewHandler creates a new Handler with the given configuration.
@@ -25,23 +33,43 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		return nil, err
 	}
 
+	staticSub, _ := fs.Sub(static.FS, ".")
+
 	h := &Handler{
 		cfg:         cfg,
 		version:     version,
 		templates:   tmpl,
-		mux:         http.NewServeMux(),
 		rateLimiter: NewRateLimiter(cfg.RateLimitRPM, cfg.RateLimitBurst),
+		staticFS:    http.StripPrefix("/static/", http.FileServer(http.FS(staticSub))),
 	}
 
-	h.registerRoutes()
+	srv := h.buildServer()
+	result, err := srv.BuildServer()
+	if err != nil {
+		return nil, fmt.Errorf("build server: %w", err)
+	}
+	h.server = result
+
 	h.buildMiddlewareChain()
 	return h, nil
 }
 
-// buildMiddlewareChain wraps the mux with middleware (outermost first).
+// buildServer creates the ServerBuilder with all API operations.
+func (h *Handler) buildServer() *builder.ServerBuilder {
+	srv := builder.NewServerBuilder(parser.OASVersion320, builder.WithoutValidation()).
+		SetTitle("oastools API").
+		SetVersion(h.version).
+		SetDescription("OpenAPI specification toolkit - validate, convert, diff, fix, join, and overlay specs")
+
+	h.registerOperations(srv)
+
+	return srv
+}
+
+// buildMiddlewareChain wraps the composite handler with middleware (outermost first).
 func (h *Handler) buildMiddlewareChain() {
 	// Build chain from inside out (last applied = outermost)
-	var handler http.Handler = h.mux
+	var handler http.Handler = http.HandlerFunc(h.route)
 
 	// Size limit (innermost - applied last)
 	handler = RequestSizeLimiter(h.cfg.MaxFileSize)(handler)
@@ -62,6 +90,57 @@ func (h *Handler) buildMiddlewareChain() {
 	handler = Logging(handler)
 
 	h.handler = handler
+}
+
+// route dispatches requests to the appropriate handler.
+func (h *Handler) route(w http.ResponseWriter, r *http.Request) {
+	// Static files
+	if strings.HasPrefix(r.URL.Path, "/static/") {
+		h.staticFS.ServeHTTP(w, r)
+		return
+	}
+
+	// API routes via ServerBuilder
+	if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/health" {
+		h.server.Handler.ServeHTTP(w, r)
+		return
+	}
+
+	// HTML pages
+	h.servePage(w, r)
+}
+
+// servePage renders HTML pages for non-API routes.
+func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
+	data := map[string]any{
+		"Version": h.version,
+	}
+
+	var templateName string
+	switch r.URL.Path {
+	case "/":
+		templateName = "index.html"
+	case "/validate":
+		templateName = "validate.html"
+	case "/convert":
+		templateName = "convert.html"
+	case "/diff":
+		templateName = "diff.html"
+	case "/fix":
+		templateName = "fix.html"
+	case "/join":
+		templateName = "join.html"
+	case "/overlay":
+		templateName = "overlay.html"
+	default:
+		http.NotFound(w, r)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := h.templates.ExecuteTemplate(w, templateName, data); err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+	}
 }
 
 // Stop performs cleanup for graceful shutdown.
