@@ -10,7 +10,14 @@ import (
 	"github.com/erraggy/oastools/builder"
 )
 
-const defaultRemoteFilename = "remote-spec"
+const (
+	defaultRemoteFilename = "remote-spec"
+
+	// Input mode constants
+	inputModeFile  = "file"
+	inputModePaste = "paste"
+	inputModeURL   = "url"
+)
 
 // InputSource represents content from any input mode (file, paste, URL).
 type InputSource struct {
@@ -44,15 +51,15 @@ func (h *Handler) readInputWithLimit(r *http.Request, fieldName string, maxSize 
 		mode = r.FormValue("input_mode")
 	}
 	if mode == "" {
-		mode = "file" // default
+		mode = inputModeFile // default
 	}
 
 	switch mode {
-	case "file":
+	case inputModeFile:
 		return h.readFileInputWithLimit(r, fieldName, maxSize)
-	case "paste":
+	case inputModePaste:
 		return h.readPasteInputWithLimit(r, fieldName, maxSize)
-	case "url":
+	case inputModeURL:
 		return h.readURLInputWithLimit(r, fieldName, maxSize)
 	default:
 		return nil, h.renderError(r, http.StatusBadRequest, "INVALID_MODE",
@@ -89,7 +96,7 @@ func (h *Handler) readFileInputWithLimit(r *http.Request, fieldName string, maxS
 	return &InputSource{
 		Content:  content,
 		Filename: header.Filename,
-		Mode:     "file",
+		Mode:     inputModeFile,
 	}, nil
 }
 
@@ -110,7 +117,7 @@ func (h *Handler) readPasteInputWithLimit(r *http.Request, fieldName string, max
 	return &InputSource{
 		Content:  []byte(content),
 		Filename: "pasted-spec",
-		Mode:     "paste",
+		Mode:     inputModePaste,
 	}, nil
 }
 
@@ -140,7 +147,7 @@ func (h *Handler) readURLInputWithLimit(r *http.Request, fieldName string, maxSi
 	return &InputSource{
 		Content:  content,
 		Filename: filename,
-		Mode:     "url",
+		Mode:     inputModeURL,
 	}, nil
 }
 
