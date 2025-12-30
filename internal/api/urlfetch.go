@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 )
@@ -26,22 +27,15 @@ var blockedHosts = map[string]bool{
 	"0.0.0.0":   true,
 	"::1":       true,
 
-	// Cloud metadata endpoints (prevent SSRF attacks)
+	// Cloud metadata hostnames (prevent SSRF attacks)
+	// Note: IP-based metadata endpoints are caught by isBlockedIP() after DNS resolution
 	"metadata.google.internal":  true, // GCP
-	"169.254.169.254":           true, // AWS/GCP/Azure metadata
 	"metadata.azure.internal":   true, // Azure
 	"metadata.alibaba.internal": true, // Alibaba Cloud
-	"100.100.100.200":           true, // Alibaba Cloud metadata
-	"fd00:ec2::254":             true, // AWS IPv6 metadata
-	"169.254.170.2":             true, // ECS task metadata
 	"kubernetes.default.svc":    true, // Kubernetes
 	"kubernetes.default":        true, // Kubernetes
 	"kubernetes":                true, // Kubernetes
 	"instance-data":             true, // DigitalOcean
-	"169.254.169.123":           true, // Amazon Time Sync
-	"2600:1f18:4254:5100::1":    true, // AWS NTP IPv6
-	"fd00:1::1":                 true, // Oracle Cloud metadata
-	"192.0.0.192":               true, // Oracle Cloud metadata
 	"link-local":                true, // Link-local
 }
 
@@ -282,14 +276,10 @@ func isBlockedHost(host string) bool {
 		return true
 	}
 
-	// Check prefixes
-	for _, prefix := range blockedHostPrefixes {
-		if strings.HasPrefix(hostOnly, prefix) {
-			return true
-		}
-	}
-
-	return false
+	// Check prefixes using slices.ContainsFunc
+	return slices.ContainsFunc(blockedHostPrefixes, func(prefix string) bool {
+		return strings.HasPrefix(hostOnly, prefix)
+	})
 }
 
 // isValidContentType checks if a content type is acceptable for OpenAPI specs.

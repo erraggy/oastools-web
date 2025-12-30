@@ -102,20 +102,20 @@ func (h *Handler) readPasteInput(r *http.Request, fieldName string) (*InputSourc
 
 // readURLInput fetches content from a URL.
 func (h *Handler) readURLInput(r *http.Request, fieldName string) (*InputSource, builder.Response) {
-	url := r.FormValue(fieldName + "_url")
-	if url == "" {
+	rawURL := r.FormValue(fieldName + "_url")
+	if rawURL == "" {
 		return nil, h.renderError(r, http.StatusBadRequest, "MISSING_URL",
 			fmt.Sprintf("%s URL is required", fieldName))
 	}
 
-	content, err := h.urlFetcher.Fetch(r.Context(), url)
+	content, err := h.urlFetcher.Fetch(r.Context(), rawURL)
 	if err != nil {
 		return nil, h.renderError(r, http.StatusBadRequest, "FETCH_FAILED",
 			fmt.Sprintf("failed to fetch URL: %v", err))
 	}
 
 	// Extract filename from URL path
-	filename := extractFilenameFromURL(url)
+	filename := extractFilenameFromURL(rawURL)
 
 	return &InputSource{
 		Content:  content,

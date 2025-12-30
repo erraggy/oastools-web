@@ -21,12 +21,9 @@ func TestIsBlockedHost(t *testing.T) {
 		{"::1 with brackets", "[::1]", true},
 		{"::1 with brackets and port", "[::1]:8080", true},
 
-		// Cloud metadata endpoints
+		// Cloud metadata hostnames (IPs are caught by isBlockedIP after DNS resolution)
 		{"GCP metadata", "metadata.google.internal", true},
-		{"AWS/GCP/Azure metadata IP", "169.254.169.254", true},
 		{"Azure metadata", "metadata.azure.internal", true},
-		{"Alibaba Cloud metadata IP", "100.100.100.200", true},
-		{"ECS task metadata", "169.254.170.2", true},
 		{"Kubernetes default", "kubernetes.default.svc", true},
 
 		// Private network ranges

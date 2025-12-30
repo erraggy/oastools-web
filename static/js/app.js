@@ -4,9 +4,13 @@ document.addEventListener('htmx:afterSwap', (evt) => {
         evt.detail.target.querySelectorAll('pre code[class*="language-"]').forEach((block) => {
             const lang = block.className.match(/language-(\w+)/);
             if (lang && lang[1]) {
-                const result = hljs.highlight(block.textContent, {language: lang[1]});
-                block.innerHTML = result.value;
-                block.classList.add('hljs');
+                try {
+                    const result = hljs.highlight(block.textContent, {language: lang[1]});
+                    block.innerHTML = result.value;
+                    block.classList.add('hljs');
+                } catch {
+                    // Language not registered, skip highlighting
+                }
             }
         });
     }

@@ -13,11 +13,12 @@ jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
           cache: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
