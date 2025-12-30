@@ -24,3 +24,5 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          # Build from source to use Go 1.25 (pre-built binaries are Go 1.24)
+          install-mode: source
