@@ -132,8 +132,8 @@ func TestIsValidContentType(t *testing.T) {
 		{"text/yaml", "text/yaml", true},
 		{"text/x-yaml", "text/x-yaml", true},
 		{"text/plain", "text/plain", true},
-		{"text/html", "text/html", true},
 		{"octet-stream", "application/octet-stream", true},
+		{"text/html rejected", "text/html", false},
 		{"invalid type", "image/png", false},
 		{"executable", "application/x-executable", false},
 	}

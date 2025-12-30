@@ -74,6 +74,12 @@ func (h *Handler) readFileInput(r *http.Request, fieldName string) (*InputSource
 			fmt.Sprintf("%s file is empty", fieldName))
 	}
 
+	// Check size limit (consistent with paste input validation)
+	if int64(len(content)) > h.cfg.MaxFileSize {
+		return nil, h.renderError(r, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE",
+			fmt.Sprintf("file exceeds maximum size of %d bytes", h.cfg.MaxFileSize))
+	}
+
 	return &InputSource{
 		Content:  content,
 		Filename: header.Filename,

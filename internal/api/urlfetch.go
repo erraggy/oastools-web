@@ -297,7 +297,6 @@ func isValidContentType(contentType string) bool {
 		"text/yaml",
 		"text/x-yaml",
 		"text/plain",
-		"text/html", // Some servers incorrectly serve YAML as HTML
 		"application/octet-stream",
 	}
 
