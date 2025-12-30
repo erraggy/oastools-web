@@ -29,15 +29,14 @@ type FixEntry struct {
 func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Response {
 	r := req.HTTPRequest
 
-	// Get file from multipart form
-	content, file, errResp := readFormFile(r, "spec")
+	// Read input from any supported mode (file, paste, URL)
+	input, errResp := h.readInput(r, "spec")
 	if errResp != nil {
 		return errResp
 	}
-	defer file.Close()
 
 	// Parse using oastools
-	parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes(input.Content))
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
@@ -45,6 +44,12 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 
 	// Configure fixer based on form options
 	f := fixer.New()
+
+	// Advanced options
+	dryRun := r.FormValue("dryRun") == "on"
+	inferTypes := r.FormValue("inferTypes") == "on"
+	f.DryRun = dryRun
+	f.InferTypes = inferTypes
 
 	// EnabledFixes controls which fix types to apply
 	// Setting to nil enables all fix types
@@ -77,7 +82,7 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	}
 
 	// Serialize result in original format
-	format := detectFormat(content)
+	format := detectFormat(input.Content)
 	output, err := serializeDocument(fixResult.Document, format)
 	if err != nil {
 		slog.Error("failed to serialize fix result",

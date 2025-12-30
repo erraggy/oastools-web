@@ -28,6 +28,46 @@
             <small>How to handle conflicting schema/path names</small>
         </div>
 
+        <details class="advanced-options">
+            <summary>Advanced Options</summary>
+            <div class="advanced-content">
+                <div class="form-group">
+                    <label for="pathStrategy">Path Collision Strategy</label>
+                    <select id="pathStrategy" name="pathStrategy">
+                        <option value="" selected>Same as default</option>
+                        <option value="first">First (keep first)</option>
+                        <option value="error">Error (fail on collision)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="schemaStrategy">Schema Collision Strategy</label>
+                    <select id="schemaStrategy" name="schemaStrategy">
+                        <option value="" selected>Same as default</option>
+                        <option value="first">First (keep first)</option>
+                        <option value="rename">Rename (suffix duplicates)</option>
+                        <option value="deduplicate">Deduplicate (merge identical)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="semanticDedup">
+                        Enable semantic deduplication
+                    </label>
+                    <small>Merge structurally identical schemas across documents</small>
+                </div>
+                <div class="form-group">
+                    <label for="preOverlay">Pre-join Overlay (optional)</label>
+                    <input type="file" id="preOverlay" name="preOverlay" accept=".json,.yaml,.yml">
+                    <small>Apply to all specs before joining</small>
+                </div>
+                <div class="form-group">
+                    <label for="postOverlay">Post-join Overlay (optional)</label>
+                    <input type="file" id="postOverlay" name="postOverlay" accept=".json,.yaml,.yml">
+                    <small>Apply to result after joining</small>
+                </div>
+            </div>
+        </details>
+
         <button type="submit" class="btn">
             Join Specifications
             <span id="spinner" class="spinner htmx-indicator"></span>
@@ -35,5 +75,46 @@
     </form>
 
     <div id="result"></div>
+
+    <details class="usage-docs">
+        <summary>Usage Examples</summary>
+        <div class="docs-content">
+            <h4>Go Library</h4>
+            <pre><code class="language-go">import "github.com/erraggy/oastools/joiner"
+
+// Simple join
+result, err := joiner.Join("api1.yaml", "api2.yaml")
+
+// With options
+config := joiner.DefaultConfig()
+config.DefaultStrategy = joiner.StrategyRenameRight
+
+j := joiner.New(config)
+result, err := j.JoinFiles("api1.yaml", "api2.yaml", "api3.yaml")
+
+fmt.Printf("Merged %d specs, %d collisions\n",
+    len(result.Sources), result.CollisionCount)</code></pre>
+
+            <h4>CLI</h4>
+            <pre><code class="language-bash"># Basic join
+oastools join api1.yaml api2.yaml
+
+# With collision strategy
+oastools join --strategy rename api1.yaml api2.yaml api3.yaml
+
+# With overlays
+oastools join api1.yaml api2.yaml \
+    --pre-overlay pre.yaml \
+    --post-overlay post.yaml
+
+# Output to file
+oastools join api1.yaml api2.yaml -o merged.yaml</code></pre>
+
+            <p>
+                <a href="https://erraggy.github.io/oastools/join" target="_blank" rel="noopener">Full documentation</a>
+                · <a href="https://pkg.go.dev/github.com/erraggy/oastools/joiner" target="_blank" rel="noopener">pkg.go.dev</a>
+            </p>
+        </div>
+    </details>
 </section>
 {{end}}

@@ -12,11 +12,29 @@
           hx-indicator="#spinner"
           hx-swap="innerHTML"
           enctype="multipart/form-data">
-        <div class="form-group">
-            <label for="spec">Specification File</label>
-            <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" required>
-            <small>Accepts JSON or YAML files up to 2MB</small>
+
+        <div class="input-section" data-field="spec">
+            <label>Specification</label>
+            <div class="input-tabs">
+                <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">Upload File</button>
+                <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste Content</button>
+                <button type="button" class="input-tab" data-mode="url" onclick="switchInputMode(this.closest('.input-section'), 'url')">Fetch URL</button>
+            </div>
+            <div class="input-content" data-mode="file">
+                <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" data-required="true" required>
+                <small>Accepts JSON or YAML files up to 2MB</small>
+            </div>
+            <div class="input-content hidden" data-mode="paste">
+                <textarea name="spec_content" rows="12" placeholder="Paste your OpenAPI specification here (JSON or YAML)..." disabled></textarea>
+                <small>Paste JSON or YAML content directly</small>
+            </div>
+            <div class="input-content hidden" data-mode="url">
+                <input type="url" name="spec_url" placeholder="https://example.com/openapi.yaml" disabled>
+                <small>Fetch specification from a public URL</small>
+            </div>
+            <input type="hidden" name="input_mode" value="file">
         </div>
+
         <div class="form-group">
             <label for="target">Target Version</label>
             <select id="target" name="target" required>
@@ -27,6 +45,35 @@
                 <option value="3.2">OpenAPI 3.2</option>
             </select>
         </div>
+
+        <details class="advanced-options">
+            <summary>Advanced Options</summary>
+            <div class="advanced-content">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="strict">
+                        Strict mode (fail on conversion issues)
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="includeInfo" checked>
+                        Include informational messages
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="preOverlay">Pre-conversion Overlay (optional)</label>
+                    <input type="file" id="preOverlay" name="preOverlay" accept=".json,.yaml,.yml">
+                    <small>Apply overlay before conversion</small>
+                </div>
+                <div class="form-group">
+                    <label for="postOverlay">Post-conversion Overlay (optional)</label>
+                    <input type="file" id="postOverlay" name="postOverlay" accept=".json,.yaml,.yml">
+                    <small>Apply overlay after conversion</small>
+                </div>
+            </div>
+        </details>
+
         <button type="submit" class="btn">
             Convert
             <span id="spinner" class="spinner htmx-indicator"></span>
@@ -34,5 +81,44 @@
     </form>
 
     <div id="result"></div>
+
+    <details class="usage-docs">
+        <summary>Usage Examples</summary>
+        <div class="docs-content">
+            <h4>Go Library</h4>
+            <pre><code class="language-go">import "github.com/erraggy/oastools/converter"
+
+// Simple conversion
+result, err := converter.Convert("openapi.yaml", "3.1")
+
+// With overlays
+result, err := converter.ConvertWithOptions(
+    converter.WithFilePath("openapi.yaml"),
+    converter.WithTargetVersion("3.1"),
+    converter.WithPreConversionOverlayFile("pre-overlay.yaml"),
+    converter.WithPostConversionOverlayFile("post-overlay.yaml"),
+)
+
+fmt.Printf("Converted from %s to %s\n",
+    result.SourceVersion, result.TargetVersion)</code></pre>
+
+            <h4>CLI</h4>
+            <pre><code class="language-bash"># Basic conversion
+oastools convert openapi.yaml --target 3.1
+
+# With overlays
+oastools convert openapi.yaml --target 3.1 \
+    --pre-overlay pre.yaml \
+    --post-overlay post.yaml
+
+# Output to file
+oastools convert openapi.yaml --target 3.1 -o converted.yaml</code></pre>
+
+            <p>
+                <a href="https://erraggy.github.io/oastools/convert" target="_blank" rel="noopener">Full documentation</a>
+                · <a href="https://pkg.go.dev/github.com/erraggy/oastools/converter" target="_blank" rel="noopener">pkg.go.dev</a>
+            </p>
+        </div>
+    </details>
 </section>
 {{end}}

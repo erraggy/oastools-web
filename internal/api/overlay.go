@@ -34,35 +34,33 @@ const maxOverlaySize = 500 * 1024
 func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder.Response {
 	r := req.HTTPRequest
 
-	// Get spec file from multipart form
-	specContent, specFile, errResp := readFormFile(r, "spec")
+	// Read spec input from any supported mode
+	specInput, errResp := h.readInput(r, "spec")
 	if errResp != nil {
 		return errResp
 	}
-	defer specFile.Close()
 
-	// Get overlay file from multipart form
-	overlayContent, overlayFile, errResp := readFormFile(r, "overlay")
+	// Read overlay input from any supported mode
+	overlayInput, errResp := h.readInput(r, "overlay")
 	if errResp != nil {
 		return errResp
 	}
-	defer overlayFile.Close()
 
-	// Validate overlay file size (500KB limit)
-	if len(overlayContent) > maxOverlaySize {
-		return h.renderError(r, http.StatusBadRequest, "FILE_TOO_LARGE",
-			"overlay file exceeds 500KB limit")
+	// Validate overlay size (500KB limit)
+	if len(overlayInput.Content) > maxOverlaySize {
+		return h.renderError(r, http.StatusBadRequest, "OVERLAY_TOO_LARGE",
+			"overlay content exceeds 500KB limit")
 	}
 
 	// Parse spec using oastools
-	parseResult, err := parser.ParseWithOptions(parser.WithBytes(specContent))
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes(specInput.Content))
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
 	}
 
 	// Parse overlay document
-	overlayDoc, err := overlay.ParseOverlay(overlayContent)
+	overlayDoc, err := overlay.ParseOverlay(overlayInput.Content)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "OVERLAY_PARSE_FAILED",
 			fmt.Sprintf("failed to parse overlay document: %v", err))
@@ -77,7 +75,7 @@ func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder
 	}
 
 	// Serialize result in original format
-	format := detectFormat(specContent)
+	format := detectFormat(specInput.Content)
 	output, err := serializeDocument(applyResult.Document, format)
 	if err != nil {
 		slog.Error("failed to serialize overlay result",

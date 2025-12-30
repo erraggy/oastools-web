@@ -12,18 +12,68 @@
           hx-indicator="#spinner"
           hx-swap="innerHTML"
           enctype="multipart/form-data">
+
         <div class="form-row">
-            <div class="form-group">
-                <label for="base">Base Specification (before)</label>
-                <input type="file" id="base" name="base" accept=".json,.yaml,.yml" required>
+            <div class="input-section" data-field="base">
+                <label>Base Specification (before)</label>
+                <div class="input-tabs">
+                    <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">File</button>
+                    <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste</button>
+                    <button type="button" class="input-tab" data-mode="url" onclick="switchInputMode(this.closest('.input-section'), 'url')">URL</button>
+                </div>
+                <div class="input-content" data-mode="file">
+                    <input type="file" name="base" accept=".json,.yaml,.yml" data-required="true" required>
+                </div>
+                <div class="input-content hidden" data-mode="paste">
+                    <textarea name="base_content" rows="8" placeholder="Paste base spec..." disabled></textarea>
+                </div>
+                <div class="input-content hidden" data-mode="url">
+                    <input type="url" name="base_url" placeholder="https://..." disabled>
+                </div>
+                <input type="hidden" name="base_mode" value="file">
                 <small>The original/older specification</small>
             </div>
-            <div class="form-group">
-                <label for="head">Head Specification (after)</label>
-                <input type="file" id="head" name="head" accept=".json,.yaml,.yml" required>
+
+            <div class="input-section" data-field="head">
+                <label>Head Specification (after)</label>
+                <div class="input-tabs">
+                    <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">File</button>
+                    <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste</button>
+                    <button type="button" class="input-tab" data-mode="url" onclick="switchInputMode(this.closest('.input-section'), 'url')">URL</button>
+                </div>
+                <div class="input-content" data-mode="file">
+                    <input type="file" name="head" accept=".json,.yaml,.yml" data-required="true" required>
+                </div>
+                <div class="input-content hidden" data-mode="paste">
+                    <textarea name="head_content" rows="8" placeholder="Paste head spec..." disabled></textarea>
+                </div>
+                <div class="input-content hidden" data-mode="url">
+                    <input type="url" name="head_url" placeholder="https://..." disabled>
+                </div>
+                <input type="hidden" name="head_mode" value="file">
                 <small>The new/modified specification</small>
             </div>
         </div>
+
+        <details class="advanced-options">
+            <summary>Advanced Options</summary>
+            <div class="advanced-content">
+                <div class="form-group">
+                    <label for="mode">Diff Mode</label>
+                    <select id="mode" name="mode">
+                        <option value="breaking" selected>Breaking (focus on breaking changes)</option>
+                        <option value="simple">Simple (all differences)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="includeInfo" checked>
+                        Include informational changes
+                    </label>
+                </div>
+            </div>
+        </details>
+
         <button type="submit" class="btn">
             Compare Specifications
             <span id="spinner" class="spinner htmx-indicator"></span>
@@ -31,5 +81,42 @@
     </form>
 
     <div id="result"></div>
+
+    <details class="usage-docs">
+        <summary>Usage Examples</summary>
+        <div class="docs-content">
+            <h4>Go Library</h4>
+            <pre><code class="language-go">import "github.com/erraggy/oastools/differ"
+
+// Simple diff
+result, err := differ.Diff("old.yaml", "new.yaml")
+
+// With breaking change detection
+result, err := differ.DiffWithOptions(
+    differ.WithFilePaths("old.yaml", "new.yaml"),
+    differ.WithMode(differ.ModeBreaking),
+    differ.WithIncludeInfo(true),
+)
+
+fmt.Printf("Breaking: %d, Warnings: %d\n",
+    result.BreakingCount, result.WarningCount)</code></pre>
+
+            <h4>CLI</h4>
+            <pre><code class="language-bash"># Basic diff
+oastools diff old.yaml new.yaml
+
+# Breaking changes only
+oastools diff --breaking old.yaml new.yaml
+
+# With URLs
+oastools diff https://api.example.com/v1/spec.yaml \
+    https://api.example.com/v2/spec.yaml</code></pre>
+
+            <p>
+                <a href="https://erraggy.github.io/oastools/diff" target="_blank" rel="noopener">Full documentation</a>
+                · <a href="https://pkg.go.dev/github.com/erraggy/oastools/differ" target="_blank" rel="noopener">pkg.go.dev</a>
+            </p>
+        </div>
+    </details>
 </section>
 {{end}}

@@ -1,0 +1,24 @@
+{
+  "name": "oastools-web",
+  "version": "1.0.0",
+  "description": "A web application for demonstrating the [oastools](https://github.com/erraggy/oastools) Go toolkit. Users can validate, convert, diff, fix, and join OpenAPI specifications directly in the browser.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/erraggy/oastools-web.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/erraggy/oastools-web/issues"
+  },
+  "homepage": "https://github.com/erraggy/oastools-web#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0"
+  }
+}

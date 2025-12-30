@@ -1,3 +1,48 @@
+// Re-highlight code blocks after HTMX swaps in new content
+document.addEventListener('htmx:afterSwap', (evt) => {
+    if (typeof hljs !== 'undefined') {
+        evt.detail.target.querySelectorAll('pre code[class*="language-"]').forEach((block) => {
+            const lang = block.className.match(/language-(\w+)/);
+            if (lang && lang[1]) {
+                const result = hljs.highlight(block.textContent, {language: lang[1]});
+                block.innerHTML = result.value;
+                block.classList.add('hljs');
+            }
+        });
+    }
+});
+
+// Switch input mode (file, paste, url) within a section
+function switchInputMode(section, mode) {
+    // Update tabs
+    section.querySelectorAll('.input-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.mode === mode);
+    });
+
+    // Update content visibility and disable hidden inputs
+    section.querySelectorAll('.input-content').forEach(content => {
+        const isActive = content.dataset.mode === mode;
+        content.classList.toggle('hidden', !isActive);
+
+        // Disable/enable inputs based on visibility
+        content.querySelectorAll('input, textarea').forEach(input => {
+            input.disabled = !isActive;
+            if (!isActive) {
+                input.removeAttribute('required');
+            } else if (input.dataset.required === 'true') {
+                input.setAttribute('required', '');
+            }
+        });
+    });
+
+    // Update hidden mode field
+    const modeInput = section.querySelector('input[name$="_mode"]') ||
+                      section.querySelector('input[name="input_mode"]');
+    if (modeInput) {
+        modeInput.value = mode;
+    }
+}
+
 // Copy text to clipboard
 function copyToClipboard(text, button) {
     navigator.clipboard.writeText(text).then(() => {

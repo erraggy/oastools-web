@@ -6,7 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{block "title" .}}oastools{{end}}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+    <script>
+        // Initialize highlight.js when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof hljs !== 'undefined') {
+                document.querySelectorAll('pre code[class*="language-"]').forEach(function(block) {
+                    if (block.dataset.highlighted !== 'yes') {
+                        hljs.highlightElement(block);
+                    }
+                });
+            }
+        });
+    </script>
 </head>
 <body>
     <header>
@@ -20,13 +39,23 @@
                 <a href="/join">Join</a>
                 <a href="/overlay">Overlay</a>
             </div>
+            <div class="external-links">
+                <a href="https://erraggy.github.io/oastools" target="_blank" rel="noopener">Docs</a>
+                <a href="https://pkg.go.dev/github.com/erraggy/oastools" target="_blank" rel="noopener">pkg.go.dev</a>
+                <a href="https://github.com/erraggy/oastools" target="_blank" rel="noopener">GitHub</a>
+            </div>
         </nav>
     </header>
     <main>
         {{block "content" .}}{{end}}
     </main>
     <footer>
-        <p>Powered by <a href="https://github.com/erraggy/oastools" target="_blank">oastools</a></p>
+        <p>
+            Powered by <a href="https://github.com/erraggy/oastools" target="_blank" rel="noopener">oastools</a>
+            · <a href="https://erraggy.github.io/oastools" target="_blank" rel="noopener">Documentation</a>
+            · <a href="https://pkg.go.dev/github.com/erraggy/oastools" target="_blank" rel="noopener">pkg.go.dev</a>
+        </p>
+        <p class="version-info">oastools-web {{.Version}} · oastools {{.OastoolsVersion}}</p>
     </footer>
     <script src="/static/js/app.js"></script>
 </body>

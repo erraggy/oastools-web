@@ -7,3 +7,8 @@ go.work.sum
 # Build artifacts
 bin/
 server
+
+# Node.js / Playwright
+node_modules/
+test-results/
+playwright-report/

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/erraggy/oastools/builder"
@@ -39,48 +38,43 @@ type DiffChange struct {
 func (h *Handler) handleDiff(_ context.Context, req *builder.Request) builder.Response {
 	r := req.HTTPRequest
 
-	// Get base file from multipart form
-	baseFile, _, err := r.FormFile("base")
-	if err != nil {
-		return h.renderError(r, http.StatusBadRequest, "MISSING_FILE", "base spec file is required")
-	}
-	defer baseFile.Close()
-
-	baseContent, err := io.ReadAll(baseFile)
-	if err != nil {
-		return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
-			fmt.Sprintf("failed to read base file: %v", err))
+	// Read base input from any supported mode
+	baseInput, errResp := h.readInput(r, "base")
+	if errResp != nil {
+		return errResp
 	}
 
-	// Get head file from multipart form
-	headFile, _, err := r.FormFile("head")
-	if err != nil {
-		return h.renderError(r, http.StatusBadRequest, "MISSING_FILE", "head spec file is required")
+	// Read head input from any supported mode
+	headInput, errResp := h.readInput(r, "head")
+	if errResp != nil {
+		return errResp
 	}
-	defer headFile.Close()
 
-	headContent, err := io.ReadAll(headFile)
-	if err != nil {
-		return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
-			fmt.Sprintf("failed to read head file: %v", err))
+	// Parse options
+	modeStr := r.FormValue("mode")
+	mode := differ.ModeBreaking
+	if modeStr == "simple" {
+		mode = differ.ModeSimple
 	}
+	includeInfo := r.FormValue("includeInfo") != "off"
+	_ = includeInfo // TODO: Apply includeInfo when library supports it
 
 	// Parse both specifications
-	baseResult, err := parser.ParseWithOptions(parser.WithBytes(baseContent))
+	baseResult, err := parser.ParseWithOptions(parser.WithBytes(baseInput.Content))
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse base specification: %v", err))
 	}
 
-	headResult, err := parser.ParseWithOptions(parser.WithBytes(headContent))
+	headResult, err := parser.ParseWithOptions(parser.WithBytes(headInput.Content))
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse head specification: %v", err))
 	}
 
-	// Diff using parse-once pattern with breaking change mode
+	// Diff using parse-once pattern
 	d := differ.New()
-	d.Mode = differ.ModeBreaking
+	d.Mode = mode
 	diffResult, err := d.DiffParsed(*baseResult, *headResult)
 	if err != nil {
 		return h.renderError(r, http.StatusUnprocessableEntity, "DIFF_FAILED",

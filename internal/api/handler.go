@@ -13,20 +13,23 @@ import (
 	"github.com/erraggy/oastools-web/internal/templates"
 	"github.com/erraggy/oastools-web/static"
 
+	"github.com/erraggy/oastools"
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/parser"
 )
 
 // Handler is the main HTTP handler for the application.
 type Handler struct {
-	cfg         *config.Config
-	version     string
-	templates   map[string]*template.Template // page name -> cloned template with that page's blocks
-	partials    *template.Template            // shared partials for result rendering
-	rateLimiter *RateLimiter
-	server      *builder.ServerResult
-	handler     http.Handler
-	staticFS    http.Handler
+	cfg              *config.Config
+	version          string
+	oastoolsVersion  string
+	templates        map[string]*template.Template // page name -> cloned template with that page's blocks
+	partials         *template.Template            // shared partials for result rendering
+	rateLimiter      *RateLimiter
+	urlFetcher       *URLFetcher
+	server           *builder.ServerResult
+	handler          http.Handler
+	staticFS         http.Handler
 }
 
 // NewHandler creates a new Handler with the given configuration.
@@ -69,13 +72,17 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 	staticHandler := http.StripPrefix("/static/", http.FileServer(http.FS(staticSub)))
 	cachedStaticHandler := StaticCache(365 * 24 * time.Hour)(staticHandler)
 
+	oastoolsVersion := oastools.Version()
+
 	h := &Handler{
-		cfg:         cfg,
-		version:     version,
-		templates:   pageTemplates,
-		partials:    partials,
-		rateLimiter: NewRateLimiter(cfg.RateLimitRPM, cfg.RateLimitBurst),
-		staticFS:    cachedStaticHandler,
+		cfg:             cfg,
+		version:         version,
+		oastoolsVersion: oastoolsVersion,
+		templates:       pageTemplates,
+		partials:        partials,
+		rateLimiter:     NewRateLimiter(cfg.RateLimitRPM, cfg.RateLimitBurst),
+		urlFetcher:      NewURLFetcher(version, oastoolsVersion),
+		staticFS:        cachedStaticHandler,
 	}
 
 	srv := h.buildServer()
@@ -148,7 +155,8 @@ func (h *Handler) route(w http.ResponseWriter, r *http.Request) {
 // servePage renders HTML pages for non-API routes.
 func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
-		"Version": h.version,
+		"Version":         h.version,
+		"OastoolsVersion": h.oastoolsVersion,
 	}
 
 	var templateName string
