@@ -49,11 +49,11 @@ tidy:
 	@echo "Tidying go modules..."
 	go mod tidy
 
-## verify-templates: Verify Go templates parse correctly
+## verify-templates: Verify Go templates parse correctly (via build)
 verify-templates:
 	@echo "Verifying templates..."
-	@go run -tags=verify ./cmd/verify-templates 2>/dev/null || \
-		go build -o /dev/null ./cmd/server && echo "Templates OK (verified via build)"
+	@go build -o /dev/null ./cmd/server
+	@echo "Templates OK"
 
 ## verify-static: Verify static assets exist and are valid
 verify-static:

@@ -57,7 +57,6 @@ func (h *Handler) handleDiff(_ context.Context, req *builder.Request) builder.Re
 		mode = differ.ModeSimple
 	}
 	includeInfo := r.FormValue("includeInfo") != "off"
-	_ = includeInfo // TODO: Apply includeInfo when library supports it
 
 	// Parse both specifications
 	baseResult, err := parser.ParseWithOptions(parser.WithBytes(baseInput.Content))
@@ -75,6 +74,7 @@ func (h *Handler) handleDiff(_ context.Context, req *builder.Request) builder.Re
 	// Diff using parse-once pattern
 	d := differ.New()
 	d.Mode = mode
+	d.IncludeInfo = includeInfo
 	diffResult, err := d.DiffParsed(*baseResult, *headResult)
 	if err != nil {
 		return h.renderError(r, http.StatusUnprocessableEntity, "DIFF_FAILED",

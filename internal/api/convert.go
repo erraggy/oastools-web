@@ -51,7 +51,11 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 	var preOverlay, postOverlay *overlay.Overlay
 	if preFile, _, err := r.FormFile("preOverlay"); err == nil {
 		defer func() { _ = preFile.Close() }()
-		preContent, _ := io.ReadAll(preFile)
+		preContent, readErr := io.ReadAll(preFile)
+		if readErr != nil {
+			return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
+				fmt.Sprintf("failed to read pre-conversion overlay: %v", readErr))
+		}
 		if len(preContent) > 0 {
 			preOverlay, err = overlay.ParseOverlay(preContent)
 			if err != nil {
@@ -62,7 +66,11 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 	}
 	if postFile, _, err := r.FormFile("postOverlay"); err == nil {
 		defer func() { _ = postFile.Close() }()
-		postContent, _ := io.ReadAll(postFile)
+		postContent, readErr := io.ReadAll(postFile)
+		if readErr != nil {
+			return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
+				fmt.Sprintf("failed to read post-conversion overlay: %v", readErr))
+		}
 		if len(postContent) > 0 {
 			postOverlay, err = overlay.ParseOverlay(postContent)
 			if err != nil {

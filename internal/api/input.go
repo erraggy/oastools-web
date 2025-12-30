@@ -18,7 +18,17 @@ type InputSource struct {
 // readInput reads spec content from any supported input mode.
 // It checks the input_mode form field to determine which source to use.
 // The fieldName is the base name for the form fields (e.g., "spec" for spec, spec_content, spec_url).
+//
+// Mode detection precedence:
+//  1. {fieldName}_mode - field-specific mode (e.g., "base_mode" for diff base spec)
+//  2. input_mode - generic mode (used for single-input operations like validate)
+//  3. "file" - default fallback
+//
+// This allows operations with multiple inputs (like diff) to use different modes
+// for each input, while single-input operations can use the simpler input_mode field.
 func (h *Handler) readInput(r *http.Request, fieldName string) (*InputSource, builder.Response) {
+	// Check field-specific mode first (e.g., "base_mode" for diff operations),
+	// then fall back to generic "input_mode" for single-input operations
 	mode := r.FormValue(fieldName + "_mode")
 	if mode == "" {
 		mode = r.FormValue("input_mode")

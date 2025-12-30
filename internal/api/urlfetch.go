@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -81,10 +82,53 @@ func NewURLFetcher(version, oastoolsVersion string) *URLFetcher {
 	userAgent := fmt.Sprintf("oastools-web/%s (oastools/%s; Go/%s; %s/%s)",
 		version, oastoolsVersion, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
+	// Custom dialer that validates resolved IP addresses to prevent DNS rebinding attacks
+	dialer := &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			// Resolve the address first
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address: %w", err)
+			}
+
+			// Resolve DNS
+			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil {
+				return nil, fmt.Errorf("DNS lookup failed: %w", err)
+			}
+
+			// Check each resolved IP against blocklist
+			for _, ip := range ips {
+				if isBlockedIP(ip.IP) {
+					return nil, fmt.Errorf("resolved IP %s is blocked (DNS rebinding protection)", ip.IP)
+				}
+			}
+
+			// Connect using the first valid IP
+			if len(ips) == 0 {
+				return nil, fmt.Errorf("no addresses found for host")
+			}
+
+			// Dial using resolved IP
+			resolvedAddr := net.JoinHostPort(ips[0].IP.String(), port)
+			return dialer.DialContext(ctx, network, resolvedAddr)
+		},
+		MaxIdleConns:        10,
+		IdleConnTimeout:     30 * time.Second,
+		DisableCompression:  true,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
 	return &URLFetcher{
 		userAgent: userAgent,
 		client: &http.Client{
-			Timeout: urlFetchTimeout,
+			Timeout:   urlFetchTimeout,
+			Transport: transport,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				// Limit redirects
 				if len(via) >= 5 {
@@ -98,6 +142,55 @@ func NewURLFetcher(version, oastoolsVersion string) *URLFetcher {
 			},
 		},
 	}
+}
+
+// isBlockedIP checks if an IP address should be blocked.
+// This provides DNS rebinding protection by checking resolved IPs.
+func isBlockedIP(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+
+	// Block loopback
+	if ip.IsLoopback() {
+		return true
+	}
+
+	// Block private networks
+	if ip.IsPrivate() {
+		return true
+	}
+
+	// Block link-local addresses
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+
+	// Block unspecified addresses (0.0.0.0, ::)
+	if ip.IsUnspecified() {
+		return true
+	}
+
+	// Block multicast
+	if ip.IsMulticast() {
+		return true
+	}
+
+	// Additional cloud metadata IP checks
+	metadataIPs := []string{
+		"169.254.169.254", // AWS/GCP/Azure metadata
+		"169.254.170.2",   // ECS task metadata
+		"169.254.169.123", // Amazon Time Sync
+		"100.100.100.200", // Alibaba Cloud metadata
+		"192.0.0.192",     // Oracle Cloud metadata
+	}
+	for _, blocked := range metadataIPs {
+		if ip.Equal(net.ParseIP(blocked)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Fetch retrieves content from a URL with security validation.
@@ -121,8 +214,8 @@ func (f *URLFetcher) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("blocked host: %s", parsed.Host)
 	}
 
-	// Create request with context
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	// Create request with context using normalized URL
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -157,8 +250,9 @@ func (f *URLFetcher) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	// Check if we hit the size limit
-	if len(content) > maxURLResponseSize {
+	// Check if we hit the size limit (we read maxURLResponseSize+1 bytes,
+	// so if content length equals that, the actual response is larger)
+	if len(content) >= maxURLResponseSize+1 {
 		return nil, fmt.Errorf("response exceeds maximum size of %d bytes", maxURLResponseSize)
 	}
 
@@ -171,25 +265,18 @@ func (f *URLFetcher) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 
 // isBlockedHost checks if a host should be blocked.
 func isBlockedHost(host string) bool {
-	// Remove port if present
-	hostOnly := host
-	if colonIdx := strings.LastIndex(host, ":"); colonIdx != -1 {
-		// Handle IPv6 addresses with brackets
-		if bracketIdx := strings.LastIndex(host, "]"); bracketIdx > colonIdx {
-			// Port is after the bracket, e.g., [::1]:8080
-			hostOnly = host[:colonIdx]
-		} else if !strings.Contains(host[:colonIdx], ":") {
-			// Regular hostname:port or IPv4:port
-			hostOnly = host[:colonIdx]
-		}
-		// If host contains multiple colons without brackets, it's an IPv6 without port
+	var hostOnly string
+
+	// Use stdlib to split host:port - handles IPv4, IPv6, and bracketed IPv6
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		hostOnly = h
+	} else {
+		// No port - strip brackets from IPv6 if present (e.g., "[::1]")
+		hostOnly = strings.Trim(host, "[]")
 	}
 
 	// Normalize to lowercase
 	hostOnly = strings.ToLower(hostOnly)
-
-	// Remove brackets from IPv6 addresses
-	hostOnly = strings.Trim(hostOnly, "[]")
 
 	// Check exact match
 	if blockedHosts[hostOnly] {
