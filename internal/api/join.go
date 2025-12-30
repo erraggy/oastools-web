@@ -131,7 +131,7 @@ func parseCollisionStrategy(s string) joiner.CollisionStrategy {
 
 func (h *Handler) buildJoinResponse(parseResults []parser.ParseResult, joinResult *joiner.JoinResult, output, format string) JoinResponse {
 	// Use the resulting spec version
-	version := "unknown"
+	version := versionUnknown
 	if len(parseResults) > 0 {
 		version = parseResults[0].Version
 	}

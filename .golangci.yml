@@ -1,0 +1,51 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+formatters:
+  enable:
+    - gofmt
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - cyclop
+    - unparam
+    - goconst
+    - gosec
+    - prealloc
+    - nilerr
+    - errorlint
+    - revive
+  settings:
+    cyclop:
+      max-complexity: 30
+    goconst:
+      min-len: 4
+      min-occurrences: 3
+    gosec:
+      excludes:
+        - G304  # File inclusion via variable - needed for template embedding
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+      - path: _test\.go
+        linters:
+          - goconst
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

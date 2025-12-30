@@ -80,7 +80,7 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 	}
 
 	// Build response
-	result := h.buildValidateResponse(parseResult, validationResult)
+	result := h.buildValidateResponse(validationResult)
 
 	// Content negotiation
 	if wantsHTML(r) {
@@ -90,7 +90,7 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 	return builder.JSON(http.StatusOK, result)
 }
 
-func (h *Handler) buildValidateResponse(parseResult *parser.ParseResult, valResult *validator.ValidationResult) ValidateResponse {
+func (h *Handler) buildValidateResponse(valResult *validator.ValidationResult) ValidateResponse {
 	errors := make([]ValidationIssue, 0, len(valResult.Errors))
 	for _, e := range valResult.Errors {
 		errors = append(errors, ValidationIssue{

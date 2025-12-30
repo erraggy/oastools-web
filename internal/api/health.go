@@ -8,6 +8,8 @@ import (
 	"github.com/erraggy/oastools/builder"
 )
 
+const versionUnknown = "unknown"
+
 // HealthResponse represents the health check response.
 type HealthResponse struct {
 	Status   string `json:"status"`
@@ -27,7 +29,7 @@ func (h *Handler) handleHealth(_ context.Context, _ *builder.Request) builder.Re
 func getOASToolsVersion() string {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
-		return "unknown"
+		return versionUnknown
 	}
 
 	for _, dep := range info.Deps {
@@ -36,5 +38,5 @@ func getOASToolsVersion() string {
 		}
 	}
 
-	return "unknown"
+	return versionUnknown
 }

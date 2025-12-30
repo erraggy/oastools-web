@@ -10,6 +10,8 @@ import (
 	"github.com/erraggy/oastools/builder"
 )
 
+const defaultRemoteFilename = "remote-spec"
+
 // InputSource represents content from any input mode (file, paste, URL).
 type InputSource struct {
 	Content  []byte
@@ -128,12 +130,12 @@ func (h *Handler) readURLInput(r *http.Request, fieldName string) (*InputSource,
 func extractFilenameFromURL(rawURL string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return "remote-spec"
+		return defaultRemoteFilename
 	}
 
 	// Paths ending with "/" are directories, not files
 	if parsed.Path == "" || parsed.Path == "/" || parsed.Path[len(parsed.Path)-1] == '/' {
-		return "remote-spec"
+		return defaultRemoteFilename
 	}
 
 	// Get the base name from the path (excludes query string automatically)
@@ -141,7 +143,7 @@ func extractFilenameFromURL(rawURL string) string {
 
 	// path.Base returns "." for empty paths
 	if filename == "" || filename == "." {
-		return "remote-spec"
+		return defaultRemoteFilename
 	}
 
 	return filename
