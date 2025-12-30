@@ -49,3 +49,6 @@ images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$SHORT_SHA'
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:latest'
 
+options:
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
+
