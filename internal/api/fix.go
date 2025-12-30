@@ -27,8 +27,10 @@ type FixEntry struct {
 }
 
 func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+
 	// Get file from multipart form
-	content, file, errResp := readFormFile(req.HTTPRequest, "spec")
+	content, file, errResp := readFormFile(r, "spec")
 	if errResp != nil {
 		return errResp
 	}
@@ -37,12 +39,8 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	// Parse using oastools
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "PARSE_FAILED",
-				Message: fmt.Sprintf("failed to parse specification: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
+			fmt.Sprintf("failed to parse specification: %v", err))
 	}
 
 	// Configure fixer based on form options
@@ -53,16 +51,16 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	var enabledFixes []fixer.FixType
 
 	// Add fix types based on checkboxes
-	if req.HTTPRequest.FormValue("fixMissingParams") == "on" {
+	if r.FormValue("fixMissingParams") == "on" {
 		enabledFixes = append(enabledFixes, fixer.FixTypeMissingPathParameter)
 	}
-	if req.HTTPRequest.FormValue("removeUnusedSchemas") == "on" {
+	if r.FormValue("removeUnusedSchemas") == "on" {
 		enabledFixes = append(enabledFixes, fixer.FixTypePrunedUnusedSchema)
 	}
-	if req.HTTPRequest.FormValue("fixInvalidNames") == "on" {
+	if r.FormValue("fixInvalidNames") == "on" {
 		enabledFixes = append(enabledFixes, fixer.FixTypeRenamedGenericSchema)
 	}
-	if req.HTTPRequest.FormValue("pruneEmptyPaths") == "on" {
+	if r.FormValue("pruneEmptyPaths") == "on" {
 		enabledFixes = append(enabledFixes, fixer.FixTypePrunedEmptyPath)
 	}
 
@@ -74,12 +72,8 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	// Fix using parse-once pattern
 	fixResult, err := f.FixParsed(*parseResult)
 	if err != nil {
-		return builder.JSON(http.StatusUnprocessableEntity, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "FIX_FAILED",
-				Message: fmt.Sprintf("fix operation failed: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusUnprocessableEntity, "FIX_FAILED",
+			fmt.Sprintf("fix operation failed: %v", err))
 	}
 
 	// Serialize result in original format
@@ -90,19 +84,15 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 			"error", err,
 			"format", format,
 		)
-		return builder.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "SERIALIZATION_FAILED",
-				Message: "failed to serialize fixed specification",
-			},
-		})
+		return h.renderError(r, http.StatusInternalServerError, "SERIALIZATION_FAILED",
+			"failed to serialize fixed specification")
 	}
 
 	// Build response
 	result := h.buildFixResponse(parseResult, fixResult, output, format)
 
 	// Content negotiation
-	if wantsHTML(req.HTTPRequest) {
+	if wantsHTML(r) {
 		return h.renderHTML("fix-result.html", result)
 	}
 

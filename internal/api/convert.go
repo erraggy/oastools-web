@@ -27,45 +27,34 @@ type ConversionIssue struct {
 }
 
 func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+
 	// Get file from multipart form
-	content, file, errResp := readFormFile(req.HTTPRequest, "spec")
+	content, file, errResp := readFormFile(r, "spec")
 	if errResp != nil {
 		return errResp
 	}
 	defer file.Close()
 
 	// Get target version
-	targetVersion := req.HTTPRequest.FormValue("target")
+	targetVersion := r.FormValue("target")
 	if err := validateTargetVersion(targetVersion); err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "INVALID_TARGET",
-				Message: err.Error(),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "INVALID_TARGET", err.Error())
 	}
 
 	// Parse using oastools
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "PARSE_FAILED",
-				Message: fmt.Sprintf("failed to parse specification: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
+			fmt.Sprintf("failed to parse specification: %v", err))
 	}
 
 	// Convert using parse-once pattern
 	c := converter.New()
 	convertResult, err := c.ConvertParsed(*parseResult, targetVersion)
 	if err != nil {
-		return builder.JSON(http.StatusUnprocessableEntity, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "CONVERSION_FAILED",
-				Message: fmt.Sprintf("conversion failed: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusUnprocessableEntity, "CONVERSION_FAILED",
+			fmt.Sprintf("conversion failed: %v", err))
 	}
 
 	// Serialize result in preferred format
@@ -76,19 +65,15 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 			"error", err,
 			"format", format,
 		)
-		return builder.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "SERIALIZATION_FAILED",
-				Message: "failed to serialize converted specification",
-			},
-		})
+		return h.renderError(r, http.StatusInternalServerError, "SERIALIZATION_FAILED",
+			"failed to serialize converted specification")
 	}
 
 	// Build response
 	result := h.buildConvertResponse(parseResult, targetVersion, convertResult, output, format)
 
 	// Content negotiation
-	if wantsHTML(req.HTTPRequest) {
+	if wantsHTML(r) {
 		return h.renderHTML("convert-result.html", result)
 	}
 

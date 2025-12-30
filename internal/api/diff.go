@@ -37,69 +37,45 @@ type DiffChange struct {
 }
 
 func (h *Handler) handleDiff(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+
 	// Get base file from multipart form
-	baseFile, _, err := req.HTTPRequest.FormFile("base")
+	baseFile, _, err := r.FormFile("base")
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "MISSING_FILE",
-				Message: "base spec file is required",
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "MISSING_FILE", "base spec file is required")
 	}
 	defer baseFile.Close()
 
 	baseContent, err := io.ReadAll(baseFile)
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "READ_FAILED",
-				Message: fmt.Sprintf("failed to read base file: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
+			fmt.Sprintf("failed to read base file: %v", err))
 	}
 
 	// Get head file from multipart form
-	headFile, _, err := req.HTTPRequest.FormFile("head")
+	headFile, _, err := r.FormFile("head")
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "MISSING_FILE",
-				Message: "head spec file is required",
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "MISSING_FILE", "head spec file is required")
 	}
 	defer headFile.Close()
 
 	headContent, err := io.ReadAll(headFile)
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "READ_FAILED",
-				Message: fmt.Sprintf("failed to read head file: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
+			fmt.Sprintf("failed to read head file: %v", err))
 	}
 
 	// Parse both specifications
 	baseResult, err := parser.ParseWithOptions(parser.WithBytes(baseContent))
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "PARSE_FAILED",
-				Message: fmt.Sprintf("failed to parse base specification: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
+			fmt.Sprintf("failed to parse base specification: %v", err))
 	}
 
 	headResult, err := parser.ParseWithOptions(parser.WithBytes(headContent))
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "PARSE_FAILED",
-				Message: fmt.Sprintf("failed to parse head specification: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
+			fmt.Sprintf("failed to parse head specification: %v", err))
 	}
 
 	// Diff using parse-once pattern with breaking change mode
@@ -107,19 +83,15 @@ func (h *Handler) handleDiff(_ context.Context, req *builder.Request) builder.Re
 	d.Mode = differ.ModeBreaking
 	diffResult, err := d.DiffParsed(*baseResult, *headResult)
 	if err != nil {
-		return builder.JSON(http.StatusUnprocessableEntity, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "DIFF_FAILED",
-				Message: fmt.Sprintf("diff operation failed: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusUnprocessableEntity, "DIFF_FAILED",
+			fmt.Sprintf("diff operation failed: %v", err))
 	}
 
 	// Build response
 	result := h.buildDiffResponse(baseResult, headResult, diffResult)
 
 	// Content negotiation
-	if wantsHTML(req.HTTPRequest) {
+	if wantsHTML(r) {
 		return h.renderHTML("diff-result.html", result)
 	}
 

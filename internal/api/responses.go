@@ -42,6 +42,33 @@ func (h *Handler) renderHTML(templateName string, data any) builder.Response {
 	return &htmlResponse{status: http.StatusOK, html: buf.String()}
 }
 
+// errorTemplateData holds data for rendering the error template.
+type errorTemplateData struct {
+	Message string
+	Details string
+}
+
+// renderError returns an error response with content negotiation.
+// For HTMX requests, renders the error template; otherwise returns JSON.
+func (h *Handler) renderError(r *http.Request, status int, code, message string) builder.Response {
+	if wantsHTML(r) {
+		var buf bytes.Buffer
+		if err := h.partials.ExecuteTemplate(&buf, "error", errorTemplateData{
+			Message: message,
+		}); err != nil {
+			slog.Error("error template execution failed", "error", err)
+			return builder.Error(status, message)
+		}
+		return &htmlResponse{status: status, html: buf.String()}
+	}
+	return builder.JSON(status, ErrorResponse{
+		Error: ErrorDetail{
+			Code:    code,
+			Message: message,
+		},
+	})
+}
+
 // wantsHTML returns true if the request prefers HTML response (HTMX requests).
 func wantsHTML(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
@@ -52,6 +79,9 @@ func wantsHTML(r *http.Request) bool {
 func readFormFile(r *http.Request, fieldName string) ([]byte, multipart.File, builder.Response) {
 	file, _, err := r.FormFile(fieldName)
 	if err != nil {
+		// Note: This returns JSON even for HTMX requests because we don't have
+		// access to Handler here. Callers that need HTML error responses should
+		// handle file errors directly using h.renderError.
 		return nil, nil, builder.JSON(http.StatusBadRequest, ErrorResponse{
 			Error: ErrorDetail{
 				Code:    "MISSING_FILE",

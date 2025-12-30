@@ -26,34 +26,24 @@ type JoinResponse struct {
 const maxJoinFileSize = 1024 * 1024
 
 func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+
 	// Parse multipart form - allow up to 5 files at 1MB each (5MB total)
 	const joinMaxSize = 5 * maxJoinFileSize
-	if err := req.HTTPRequest.ParseMultipartForm(joinMaxSize); err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "FORM_PARSE_FAILED",
-				Message: fmt.Sprintf("failed to parse form: %v", err),
-			},
-		})
+	if err := r.ParseMultipartForm(joinMaxSize); err != nil {
+		return h.renderError(r, http.StatusBadRequest, "FORM_PARSE_FAILED",
+			fmt.Sprintf("failed to parse form: %v", err))
 	}
 
 	// Get all spec files
-	files := req.HTTPRequest.MultipartForm.File["specs"]
+	files := r.MultipartForm.File["specs"]
 	if len(files) < 2 {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "INSUFFICIENT_FILES",
-				Message: "at least 2 specification files are required",
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "INSUFFICIENT_FILES",
+			"at least 2 specification files are required")
 	}
 	if len(files) > 5 {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "TOO_MANY_FILES",
-				Message: "maximum 5 specification files allowed",
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "TOO_MANY_FILES",
+			"maximum 5 specification files allowed")
 	}
 
 	// Parse all specifications
@@ -62,33 +52,21 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 	for i, fileHeader := range files {
 		file, err := fileHeader.Open()
 		if err != nil {
-			return builder.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: ErrorDetail{
-					Code:    "FILE_OPEN_FAILED",
-					Message: fmt.Sprintf("failed to open file %s: %v", fileHeader.Filename, err),
-				},
-			})
+			return h.renderError(r, http.StatusBadRequest, "FILE_OPEN_FAILED",
+				fmt.Sprintf("failed to open file %s: %v", fileHeader.Filename, err))
 		}
 
 		content, err := io.ReadAll(file)
 		file.Close()
 		if err != nil {
-			return builder.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: ErrorDetail{
-					Code:    "READ_FAILED",
-					Message: fmt.Sprintf("failed to read file %s: %v", fileHeader.Filename, err),
-				},
-			})
+			return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
+				fmt.Sprintf("failed to read file %s: %v", fileHeader.Filename, err))
 		}
 
 		// Validate per-file size limit (1MB)
 		if len(content) > maxJoinFileSize {
-			return builder.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: ErrorDetail{
-					Code:    "FILE_TOO_LARGE",
-					Message: fmt.Sprintf("file %s exceeds 1MB limit", fileHeader.Filename),
-				},
-			})
+			return h.renderError(r, http.StatusBadRequest, "FILE_TOO_LARGE",
+				fmt.Sprintf("file %s exceeds 1MB limit", fileHeader.Filename))
 		}
 
 		// Track format from first file
@@ -98,30 +76,22 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 
 		parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
 		if err != nil {
-			return builder.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: ErrorDetail{
-					Code:    "PARSE_FAILED",
-					Message: fmt.Sprintf("failed to parse %s: %v", fileHeader.Filename, err),
-				},
-			})
+			return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
+				fmt.Sprintf("failed to parse %s: %v", fileHeader.Filename, err))
 		}
 		parseResults = append(parseResults, *parseResult)
 	}
 
 	// Configure joiner with collision strategy
 	config := joiner.DefaultConfig()
-	config.DefaultStrategy = parseCollisionStrategy(req.HTTPRequest.FormValue("strategy"))
+	config.DefaultStrategy = parseCollisionStrategy(r.FormValue("strategy"))
 
 	// Join using parse-once pattern
 	j := joiner.New(config)
 	joinResult, err := j.JoinParsed(parseResults)
 	if err != nil {
-		return builder.JSON(http.StatusUnprocessableEntity, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "JOIN_FAILED",
-				Message: fmt.Sprintf("join operation failed: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusUnprocessableEntity, "JOIN_FAILED",
+			fmt.Sprintf("join operation failed: %v", err))
 	}
 
 	// Serialize result in first file's format
@@ -131,19 +101,15 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 			"error", err,
 			"format", firstFormat,
 		)
-		return builder.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "SERIALIZATION_FAILED",
-				Message: "failed to serialize joined specification",
-			},
-		})
+		return h.renderError(r, http.StatusInternalServerError, "SERIALIZATION_FAILED",
+			"failed to serialize joined specification")
 	}
 
 	// Build response
 	result := h.buildJoinResponse(parseResults, joinResult, output, firstFormat)
 
 	// Content negotiation
-	if wantsHTML(req.HTTPRequest) {
+	if wantsHTML(r) {
 		return h.renderHTML("join-result.html", result)
 	}
 

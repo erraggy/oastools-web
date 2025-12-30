@@ -32,15 +32,17 @@ type OverlayChange struct {
 const maxOverlaySize = 500 * 1024
 
 func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+
 	// Get spec file from multipart form
-	specContent, specFile, errResp := readFormFile(req.HTTPRequest, "spec")
+	specContent, specFile, errResp := readFormFile(r, "spec")
 	if errResp != nil {
 		return errResp
 	}
 	defer specFile.Close()
 
 	// Get overlay file from multipart form
-	overlayContent, overlayFile, errResp := readFormFile(req.HTTPRequest, "overlay")
+	overlayContent, overlayFile, errResp := readFormFile(r, "overlay")
 	if errResp != nil {
 		return errResp
 	}
@@ -48,46 +50,30 @@ func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder
 
 	// Validate overlay file size (500KB limit)
 	if len(overlayContent) > maxOverlaySize {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "FILE_TOO_LARGE",
-				Message: "overlay file exceeds 500KB limit",
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "FILE_TOO_LARGE",
+			"overlay file exceeds 500KB limit")
 	}
 
 	// Parse spec using oastools
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(specContent))
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "PARSE_FAILED",
-				Message: fmt.Sprintf("failed to parse specification: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
+			fmt.Sprintf("failed to parse specification: %v", err))
 	}
 
 	// Parse overlay document
 	overlayDoc, err := overlay.ParseOverlay(overlayContent)
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "OVERLAY_PARSE_FAILED",
-				Message: fmt.Sprintf("failed to parse overlay document: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "OVERLAY_PARSE_FAILED",
+			fmt.Sprintf("failed to parse overlay document: %v", err))
 	}
 
 	// Apply overlay using parse-once pattern
 	applier := overlay.NewApplier()
 	applyResult, err := applier.ApplyParsed(parseResult, overlayDoc)
 	if err != nil {
-		return builder.JSON(http.StatusUnprocessableEntity, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "OVERLAY_FAILED",
-				Message: fmt.Sprintf("overlay application failed: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusUnprocessableEntity, "OVERLAY_FAILED",
+			fmt.Sprintf("overlay application failed: %v", err))
 	}
 
 	// Serialize result in original format
@@ -98,19 +84,15 @@ func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder
 			"error", err,
 			"format", format,
 		)
-		return builder.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "SERIALIZATION_FAILED",
-				Message: "failed to serialize overlay result",
-			},
-		})
+		return h.renderError(r, http.StatusInternalServerError, "SERIALIZATION_FAILED",
+			"failed to serialize overlay result")
 	}
 
 	// Build response
 	result := h.buildOverlayResponse(parseResult, applyResult, output, format)
 
 	// Content negotiation
-	if wantsHTML(req.HTTPRequest) {
+	if wantsHTML(r) {
 		return h.renderHTML("overlay-result.html", result)
 	}
 
