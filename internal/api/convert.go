@@ -43,10 +43,6 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 		return h.renderError(r, http.StatusBadRequest, "INVALID_TARGET", err.Error())
 	}
 
-	// Parse options
-	strict := r.FormValue("strict") == "on"
-	_ = strict // TODO: Apply strict mode when library supports it
-
 	// Read optional overlay files
 	var preOverlay, postOverlay *overlay.Overlay
 	if preFile, _, err := r.FormFile("preOverlay"); err == nil {

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 
 	"github.com/erraggy/oastools/builder"
 )
@@ -122,26 +124,25 @@ func (h *Handler) readURLInput(r *http.Request, fieldName string) (*InputSource,
 	}, nil
 }
 
-// extractFilenameFromURL extracts a filename from a URL, falling back to "remote-spec".
+// extractFilenameFromURL extracts a filename from a URL path, falling back to "remote-spec".
 func extractFilenameFromURL(rawURL string) string {
-	// Simple extraction: find last path segment
-	for i := len(rawURL) - 1; i >= 0; i-- {
-		if rawURL[i] == '/' {
-			if i < len(rawURL)-1 {
-				filename := rawURL[i+1:]
-				// Remove query string if present
-				for j := 0; j < len(filename); j++ {
-					if filename[j] == '?' {
-						filename = filename[:j]
-						break
-					}
-				}
-				if filename != "" {
-					return filename
-				}
-			}
-			break
-		}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "remote-spec"
 	}
-	return "remote-spec"
+
+	// Paths ending with "/" are directories, not files
+	if parsed.Path == "" || parsed.Path == "/" || parsed.Path[len(parsed.Path)-1] == '/' {
+		return "remote-spec"
+	}
+
+	// Get the base name from the path (excludes query string automatically)
+	filename := path.Base(parsed.Path)
+
+	// path.Base returns "." for empty paths
+	if filename == "" || filename == "." {
+		return "remote-spec"
+	}
+
+	return filename
 }

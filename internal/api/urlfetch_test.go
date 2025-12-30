@@ -162,7 +162,7 @@ func TestExtractFilenameFromURL(t *testing.T) {
 		{"nested path", "https://github.com/owner/repo/blob/main/openapi.yaml", "openapi.yaml"},
 		{"no filename", "https://example.com/", "remote-spec"},
 		{"trailing slash", "https://example.com/api/", "remote-spec"},
-		{"just host", "https://example.com", "example.com"}, // extracts after last /
+		{"just host", "https://example.com", "remote-spec"},
 	}
 
 	for _, tt := range tests {

@@ -14,7 +14,7 @@ import (
 
 const (
 	urlFetchTimeout    = 10 * time.Second
-	maxURLResponseSize = 2 << 20 // 2MB - same as file upload limit
+	maxURLResponseSize = 2 * 1024 * 1024 // 2MB - same as file upload limit
 )
 
 // blockedHosts contains hosts that should never be fetched for security reasons.
@@ -250,9 +250,8 @@ func (f *URLFetcher) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	// Check if we hit the size limit (we read maxURLResponseSize+1 bytes,
-	// so if content length equals that, the actual response is larger)
-	if len(content) >= maxURLResponseSize+1 {
+	// Check if content exceeds size limit
+	if len(content) > maxURLResponseSize {
 		return nil, fmt.Errorf("response exceeds maximum size of %d bytes", maxURLResponseSize)
 	}
 
