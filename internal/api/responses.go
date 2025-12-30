@@ -29,10 +29,10 @@ func (r *htmlResponse) WriteTo(w http.ResponseWriter) error {
 	return err
 }
 
-// renderHTML renders a template to an HTML response.
+// renderHTML renders a partial template to an HTML response.
 func (h *Handler) renderHTML(templateName string, data any) builder.Response {
 	var buf bytes.Buffer
-	if err := h.templates.ExecuteTemplate(&buf, templateName, data); err != nil {
+	if err := h.partials.ExecuteTemplate(&buf, templateName, data); err != nil {
 		slog.Error("template execution failed",
 			"template", templateName,
 			"error", err,

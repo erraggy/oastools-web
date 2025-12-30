@@ -87,7 +87,7 @@ converter.ConvertParsed(parseResult, v)  // Not converter.Convert(content, v)
 Environment variables:
 - `PORT` - HTTP port (default: 8080, set by Cloud Run)
 - `LOG_LEVEL` - debug/info/warn/error (default: info)
-- `RATE_LIMIT_RPM` - requests per minute per IP (default: 10)
+- `RATE_LIMIT_RPM` - requests per minute per IP (default: 60)
 - `MAX_FILE_SIZE` - max upload bytes (default: 2MB)
 - `REQUEST_TIMEOUT` - processing timeout (default: 30s)
 - `MAX_CONCURRENT_REQUESTS` - global concurrent request limit (default: 10)
@@ -96,7 +96,7 @@ Environment variables:
 
 - Max file size: 2MB (spec), 500KB (overlay), 1MB each for join (5 max)
 - Request timeout: 30 seconds
-- Rate limit: 10 req/min/IP with burst of 3
+- Rate limit: 60 req/min/IP with burst of 10 (excludes static files)
 - Global concurrent requests: 10
 
 ## Deployment
