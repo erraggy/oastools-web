@@ -111,3 +111,7 @@ gcloud run deploy oastools-web \
 ```
 
 Rollback: `gcloud run services update-traffic oastools-web --to-revisions=<revision>=100`
+
+## Tool Preferences
+
+- **GitHub resources**: Always use `gh` CLI over WebFetch for accessing GitHub (issues, PRs, releases, etc.)
