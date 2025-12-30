@@ -15,11 +15,17 @@ const defaultRemoteFilename = "remote-spec"
 // InputSource represents content from any input mode (file, paste, URL).
 type InputSource struct {
 	Content  []byte
-	Filename string // For file mode, the uploaded filename; for URL mode, derived from URL
+	Filename string // file: uploaded filename; paste: "pasted-spec"; url: derived from URL path
 	Mode     string // "file", "paste", or "url"
 }
 
-// readInput reads spec content from any supported input mode.
+// readInput reads spec content from any supported input mode using the default MaxFileSize limit.
+// See readInputWithLimit for custom size limits.
+func (h *Handler) readInput(r *http.Request, fieldName string) (*InputSource, builder.Response) {
+	return h.readInputWithLimit(r, fieldName, h.cfg.MaxFileSize)
+}
+
+// readInputWithLimit reads spec content from any supported input mode with a custom size limit.
 // It checks the input_mode form field to determine which source to use.
 // The fieldName is the base name for the form fields (e.g., "spec" for spec, spec_content, spec_url).
 //
@@ -30,7 +36,7 @@ type InputSource struct {
 //
 // This allows operations with multiple inputs (like diff) to use different modes
 // for each input, while single-input operations can use the simpler input_mode field.
-func (h *Handler) readInput(r *http.Request, fieldName string) (*InputSource, builder.Response) {
+func (h *Handler) readInputWithLimit(r *http.Request, fieldName string, maxSize int64) (*InputSource, builder.Response) {
 	// Check field-specific mode first (e.g., "base_mode" for diff operations),
 	// then fall back to generic "input_mode" for single-input operations
 	mode := r.FormValue(fieldName + "_mode")
@@ -43,19 +49,19 @@ func (h *Handler) readInput(r *http.Request, fieldName string) (*InputSource, bu
 
 	switch mode {
 	case "file":
-		return h.readFileInput(r, fieldName)
+		return h.readFileInputWithLimit(r, fieldName, maxSize)
 	case "paste":
-		return h.readPasteInput(r, fieldName)
+		return h.readPasteInputWithLimit(r, fieldName, maxSize)
 	case "url":
-		return h.readURLInput(r, fieldName)
+		return h.readURLInputWithLimit(r, fieldName, maxSize)
 	default:
 		return nil, h.renderError(r, http.StatusBadRequest, "INVALID_MODE",
 			fmt.Sprintf("invalid input mode: %s", mode))
 	}
 }
 
-// readFileInput reads content from a file upload.
-func (h *Handler) readFileInput(r *http.Request, fieldName string) (*InputSource, builder.Response) {
+// readFileInputWithLimit reads content from a file upload with a custom size limit.
+func (h *Handler) readFileInputWithLimit(r *http.Request, fieldName string, maxSize int64) (*InputSource, builder.Response) {
 	file, header, err := r.FormFile(fieldName)
 	if err != nil {
 		return nil, h.renderError(r, http.StatusBadRequest, "MISSING_FILE",
@@ -74,10 +80,10 @@ func (h *Handler) readFileInput(r *http.Request, fieldName string) (*InputSource
 			fmt.Sprintf("%s file is empty", fieldName))
 	}
 
-	// Check size limit (consistent with paste input validation)
-	if int64(len(content)) > h.cfg.MaxFileSize {
+	// Check size limit
+	if int64(len(content)) > maxSize {
 		return nil, h.renderError(r, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE",
-			fmt.Sprintf("file exceeds maximum size of %d bytes", h.cfg.MaxFileSize))
+			fmt.Sprintf("file exceeds maximum size of %d bytes", maxSize))
 	}
 
 	return &InputSource{
@@ -87,18 +93,18 @@ func (h *Handler) readFileInput(r *http.Request, fieldName string) (*InputSource
 	}, nil
 }
 
-// readPasteInput reads content from a pasted textarea.
-func (h *Handler) readPasteInput(r *http.Request, fieldName string) (*InputSource, builder.Response) {
+// readPasteInputWithLimit reads content from a pasted textarea with a custom size limit.
+func (h *Handler) readPasteInputWithLimit(r *http.Request, fieldName string, maxSize int64) (*InputSource, builder.Response) {
 	content := r.FormValue(fieldName + "_content")
 	if content == "" {
 		return nil, h.renderError(r, http.StatusBadRequest, "MISSING_CONTENT",
 			fmt.Sprintf("%s content is required", fieldName))
 	}
 
-	// Check size limit (same as file upload limit)
-	if int64(len(content)) > h.cfg.MaxFileSize {
+	// Check size limit
+	if int64(len(content)) > maxSize {
 		return nil, h.renderError(r, http.StatusRequestEntityTooLarge, "CONTENT_TOO_LARGE",
-			fmt.Sprintf("content exceeds maximum size of %d bytes", h.cfg.MaxFileSize))
+			fmt.Sprintf("content exceeds maximum size of %d bytes", maxSize))
 	}
 
 	return &InputSource{
@@ -108,8 +114,8 @@ func (h *Handler) readPasteInput(r *http.Request, fieldName string) (*InputSourc
 	}, nil
 }
 
-// readURLInput fetches content from a URL.
-func (h *Handler) readURLInput(r *http.Request, fieldName string) (*InputSource, builder.Response) {
+// readURLInputWithLimit fetches content from a URL with a custom size limit.
+func (h *Handler) readURLInputWithLimit(r *http.Request, fieldName string, maxSize int64) (*InputSource, builder.Response) {
 	rawURL := r.FormValue(fieldName + "_url")
 	if rawURL == "" {
 		return nil, h.renderError(r, http.StatusBadRequest, "MISSING_URL",
@@ -120,6 +126,12 @@ func (h *Handler) readURLInput(r *http.Request, fieldName string) (*InputSource,
 	if err != nil {
 		return nil, h.renderError(r, http.StatusBadRequest, "FETCH_FAILED",
 			fmt.Sprintf("failed to fetch URL: %v", err))
+	}
+
+	// Check size limit (URLFetcher has its own 2MB limit, but operation may need stricter)
+	if int64(len(content)) > maxSize {
+		return nil, h.renderError(r, http.StatusRequestEntityTooLarge, "URL_CONTENT_TOO_LARGE",
+			fmt.Sprintf("fetched content exceeds maximum size of %d bytes", maxSize))
 	}
 
 	// Extract filename from URL path

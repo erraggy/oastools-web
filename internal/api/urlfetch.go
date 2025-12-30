@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -39,7 +40,9 @@ var blockedHosts = map[string]bool{
 	"link-local":                true, // Link-local
 }
 
-// blockedHostPrefixes contains hostname prefixes that should be blocked.
+// blockedHostPrefixes catches direct IP access attempts at the hostname level
+// before DNS resolution. This is a first-line defense; the authoritative check
+// happens in isBlockedIP() after DNS resolution, which uses net.IP methods.
 var blockedHostPrefixes = []string{
 	"10.",     // Private network
 	"172.16.", // Private network (172.16.0.0 - 172.31.255.255 range)
@@ -59,15 +62,17 @@ var blockedHostPrefixes = []string{
 	"172.30.",
 	"172.31.",
 	"192.168.", // Private network
-	"fc00:",    // IPv6 unique local
-	"fd",       // IPv6 unique local
 	"fe80:",    // IPv6 link-local
+	// Note: fc00::/7 (unique local) is not prefix-blocked here because the range
+	// (fc00:: - fdff::) can't be efficiently matched by prefix. These addresses
+	// are caught by isBlockedIP() after DNS resolution via ip.IsPrivate().
 }
 
 // URLFetcher fetches content from URLs with security controls.
 type URLFetcher struct {
-	client    *http.Client
-	userAgent string
+	client        *http.Client
+	userAgent     string
+	skipHostCheck bool // for testing only - bypasses SSRF host validation
 }
 
 // NewURLFetcher creates a new URL fetcher with security controls.
@@ -99,6 +104,10 @@ func NewURLFetcher(version, oastoolsVersion string) *URLFetcher {
 			// Check each resolved IP against blocklist
 			for _, ip := range ips {
 				if isBlockedIP(ip.IP) {
+					slog.Warn("SSRF: DNS rebinding attack blocked",
+						"host", host,
+						"resolved_ip", ip.IP.String(),
+					)
 					return nil, fmt.Errorf("resolved IP %s is blocked (DNS rebinding protection)", ip.IP)
 				}
 			}
@@ -130,6 +139,10 @@ func NewURLFetcher(version, oastoolsVersion string) *URLFetcher {
 				}
 				// Check if redirect target is blocked
 				if isBlockedHost(req.URL.Host) {
+					slog.Warn("SSRF: redirect to blocked host",
+						"blocked_host", req.URL.Host,
+						"original_url", via[0].URL.String(),
+					)
 					return fmt.Errorf("redirect to blocked host: %s", req.URL.Host)
 				}
 				return nil
@@ -171,12 +184,17 @@ func isBlockedIP(ip net.IP) bool {
 	}
 
 	// Additional cloud metadata IP checks
+	// Note: 169.254.x.x IPs are already blocked by IsLinkLocalUnicast() above,
+	// but we list them explicitly for defense-in-depth. The non-link-local IPs
+	// require explicit blocking:
+	//   - 100.100.100.200 (Alibaba Cloud - in Carrier-Grade NAT range)
+	//   - 192.0.0.192 (Oracle Cloud - in IETF protocol assignments range)
 	metadataIPs := []string{
-		"169.254.169.254", // AWS/GCP/Azure metadata
-		"169.254.170.2",   // ECS task metadata
-		"169.254.169.123", // Amazon Time Sync
-		"100.100.100.200", // Alibaba Cloud metadata
-		"192.0.0.192",     // Oracle Cloud metadata
+		"169.254.169.254", // AWS/GCP/Azure metadata (also covered by IsLinkLocalUnicast)
+		"169.254.170.2",   // ECS task metadata (also covered by IsLinkLocalUnicast)
+		"169.254.169.123", // Amazon Time Sync (also covered by IsLinkLocalUnicast)
+		"100.100.100.200", // Alibaba Cloud metadata (NOT link-local, requires explicit block)
+		"192.0.0.192",     // Oracle Cloud metadata (NOT link-local, requires explicit block)
 	}
 	for _, blocked := range metadataIPs {
 		if ip.Equal(net.ParseIP(blocked)) {
@@ -203,8 +221,12 @@ func (f *URLFetcher) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("only http/https URLs are supported, got: %s", parsed.Scheme)
 	}
 
-	// Check for blocked hosts
-	if isBlockedHost(parsed.Host) {
+	// Check for blocked hosts (skip in test mode)
+	if !f.skipHostCheck && isBlockedHost(parsed.Host) {
+		slog.Warn("SSRF: blocked host access attempt",
+			"host", parsed.Host,
+			"url", rawURL,
+		)
 		return nil, fmt.Errorf("blocked host: %s", parsed.Host)
 	}
 

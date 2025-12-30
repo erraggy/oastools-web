@@ -47,7 +47,22 @@ type errorTemplateData struct {
 
 // renderError returns an error response with content negotiation.
 // For HTMX requests, renders the error template; otherwise returns JSON.
+// All errors are logged server-side for monitoring and debugging.
 func (h *Handler) renderError(r *http.Request, status int, code, message string) builder.Response {
+	// Log all errors server-side for monitoring and debugging
+	attrs := []any{
+		"status", status,
+		"code", code,
+		"message", message,
+		"path", r.URL.Path,
+		"method", r.Method,
+	}
+	if status >= 500 {
+		slog.Error("request error", attrs...)
+	} else {
+		slog.Warn("request error", attrs...)
+	}
+
 	if wantsHTML(r) {
 		var buf bytes.Buffer
 		if err := h.partials.ExecuteTemplate(&buf, "error", errorTemplateData{

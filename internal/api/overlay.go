@@ -40,16 +40,10 @@ func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder
 		return errResp
 	}
 
-	// Read overlay input from any supported mode
-	overlayInput, errResp := h.readInput(r, "overlay")
+	// Read overlay input with 500KB limit (stricter than default for overlays)
+	overlayInput, errResp := h.readInputWithLimit(r, "overlay", maxOverlaySize)
 	if errResp != nil {
 		return errResp
-	}
-
-	// Validate overlay size (500KB limit)
-	if len(overlayInput.Content) > maxOverlaySize {
-		return h.renderError(r, http.StatusBadRequest, "OVERLAY_TOO_LARGE",
-			"overlay content exceeds 500KB limit")
 	}
 
 	// Parse spec using oastools
