@@ -47,7 +47,7 @@ func (h *Handler) readFileInput(r *http.Request, fieldName string) (*InputSource
 		return nil, h.renderError(r, http.StatusBadRequest, "MISSING_FILE",
 			fmt.Sprintf("%s file is required", fieldName))
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	content, err := io.ReadAll(file)
 	if err != nil {

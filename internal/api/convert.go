@@ -50,7 +50,7 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 	// Read optional overlay files
 	var preOverlay, postOverlay *overlay.Overlay
 	if preFile, _, err := r.FormFile("preOverlay"); err == nil {
-		defer preFile.Close()
+		defer func() { _ = preFile.Close() }()
 		preContent, _ := io.ReadAll(preFile)
 		if len(preContent) > 0 {
 			preOverlay, err = overlay.ParseOverlay(preContent)
@@ -61,7 +61,7 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 		}
 	}
 	if postFile, _, err := r.FormFile("postOverlay"); err == nil {
-		defer postFile.Close()
+		defer func() { _ = postFile.Close() }()
 		postContent, _ := io.ReadAll(postFile)
 		if len(postContent) > 0 {
 			postOverlay, err = overlay.ParseOverlay(postContent)

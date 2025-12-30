@@ -57,7 +57,7 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 		}
 
 		content, err := io.ReadAll(file)
-		file.Close()
+		_ = file.Close()
 		if err != nil {
 			return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
 				fmt.Sprintf("failed to read file %s: %v", fileHeader.Filename, err))

@@ -20,16 +20,16 @@ import (
 
 // Handler is the main HTTP handler for the application.
 type Handler struct {
-	cfg              *config.Config
-	version          string
-	oastoolsVersion  string
-	templates        map[string]*template.Template // page name -> cloned template with that page's blocks
-	partials         *template.Template            // shared partials for result rendering
-	rateLimiter      *RateLimiter
-	urlFetcher       *URLFetcher
-	server           *builder.ServerResult
-	handler          http.Handler
-	staticFS         http.Handler
+	cfg             *config.Config
+	version         string
+	oastoolsVersion string
+	templates       map[string]*template.Template // page name -> cloned template with that page's blocks
+	partials        *template.Template            // shared partials for result rendering
+	rateLimiter     *RateLimiter
+	urlFetcher      *URLFetcher
+	server          *builder.ServerResult
+	handler         http.Handler
+	staticFS        http.Handler
 }
 
 // NewHandler creates a new Handler with the given configuration.

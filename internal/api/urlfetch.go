@@ -26,28 +26,28 @@ var blockedHosts = map[string]bool{
 	"::1":       true,
 
 	// Cloud metadata endpoints (prevent SSRF attacks)
-	"metadata.google.internal":     true, // GCP
-	"169.254.169.254":              true, // AWS/GCP/Azure metadata
-	"metadata.azure.internal":      true, // Azure
-	"metadata.alibaba.internal":    true, // Alibaba Cloud
-	"100.100.100.200":              true, // Alibaba Cloud metadata
-	"fd00:ec2::254":                true, // AWS IPv6 metadata
-	"169.254.170.2":                true, // ECS task metadata
-	"kubernetes.default.svc":       true, // Kubernetes
-	"kubernetes.default":           true, // Kubernetes
-	"kubernetes":                   true, // Kubernetes
-	"instance-data":                true, // DigitalOcean
-	"169.254.169.123":              true, // Amazon Time Sync
-	"2600:1f18:4254:5100::1":       true, // AWS NTP IPv6
-	"fd00:1::1":                    true, // Oracle Cloud metadata
-	"192.0.0.192":                  true, // Oracle Cloud metadata
-	"link-local":                   true, // Link-local
+	"metadata.google.internal":  true, // GCP
+	"169.254.169.254":           true, // AWS/GCP/Azure metadata
+	"metadata.azure.internal":   true, // Azure
+	"metadata.alibaba.internal": true, // Alibaba Cloud
+	"100.100.100.200":           true, // Alibaba Cloud metadata
+	"fd00:ec2::254":             true, // AWS IPv6 metadata
+	"169.254.170.2":             true, // ECS task metadata
+	"kubernetes.default.svc":    true, // Kubernetes
+	"kubernetes.default":        true, // Kubernetes
+	"kubernetes":                true, // Kubernetes
+	"instance-data":             true, // DigitalOcean
+	"169.254.169.123":           true, // Amazon Time Sync
+	"2600:1f18:4254:5100::1":    true, // AWS NTP IPv6
+	"fd00:1::1":                 true, // Oracle Cloud metadata
+	"192.0.0.192":               true, // Oracle Cloud metadata
+	"link-local":                true, // Link-local
 }
 
 // blockedHostPrefixes contains hostname prefixes that should be blocked.
 var blockedHostPrefixes = []string{
-	"10.",      // Private network
-	"172.16.",  // Private network (172.16.0.0 - 172.31.255.255 range)
+	"10.",     // Private network
+	"172.16.", // Private network (172.16.0.0 - 172.31.255.255 range)
 	"172.17.",
 	"172.18.",
 	"172.19.",
@@ -136,7 +136,7 @@ func (f *URLFetcher) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {

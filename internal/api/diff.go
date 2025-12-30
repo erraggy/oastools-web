@@ -100,7 +100,7 @@ func (h *Handler) buildDiffResponse(baseResult, headResult *parser.ParseResult, 
 			Path:     change.Path,
 			Type:     string(change.Type),
 			Category: string(change.Category),
-			Severity: string(change.Severity),
+			Severity: change.Severity.String(),
 			Message:  change.Message,
 		})
 	}

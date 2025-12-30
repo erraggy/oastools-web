@@ -3,10 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 
 	"github.com/erraggy/oastools/builder"
@@ -72,36 +69,6 @@ func (h *Handler) renderError(r *http.Request, status int, code, message string)
 // wantsHTML returns true if the request prefers HTML response (HTMX requests).
 func wantsHTML(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
-}
-
-// readFormFile reads a file from the multipart form and returns its contents.
-// Returns nil content and an error response if the file cannot be read.
-func readFormFile(r *http.Request, fieldName string) ([]byte, multipart.File, builder.Response) {
-	file, _, err := r.FormFile(fieldName)
-	if err != nil {
-		// Note: This returns JSON even for HTMX requests because we don't have
-		// access to Handler here. Callers that need HTML error responses should
-		// handle file errors directly using h.renderError.
-		return nil, nil, builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "MISSING_FILE",
-				Message: fmt.Sprintf("%s file is required", fieldName),
-			},
-		})
-	}
-
-	content, err := io.ReadAll(file)
-	if err != nil {
-		file.Close()
-		return nil, nil, builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "READ_FAILED",
-				Message: fmt.Sprintf("failed to read %s file: %v", fieldName, err),
-			},
-		})
-	}
-
-	return content, file, nil
 }
 
 // serializeDocument serializes a document to JSON or YAML based on the format.
