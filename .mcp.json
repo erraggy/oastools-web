@@ -1,11 +1,10 @@
 {
   "mcpServers": {
-    "playwright": {
+    "gopls-mcp": {
       "type": "stdio",
-      "command": "npx",
+      "command": "gopls",
       "args": [
-        "-y",
-        "@playwright/mcp@latest"
+        "mcp"
       ],
       "env": {}
     }
