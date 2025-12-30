@@ -3,11 +3,13 @@ package api
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/converter"
+	"github.com/erraggy/oastools/overlay"
 	"github.com/erraggy/oastools/parser"
 )
 
@@ -29,12 +31,11 @@ type ConversionIssue struct {
 func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder.Response {
 	r := req.HTTPRequest
 
-	// Get file from multipart form
-	content, file, errResp := readFormFile(r, "spec")
+	// Read input from any supported mode (file, paste, URL)
+	input, errResp := h.readInput(r, "spec")
 	if errResp != nil {
 		return errResp
 	}
-	defer file.Close()
 
 	// Get target version
 	targetVersion := r.FormValue("target")
@@ -42,23 +43,67 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 		return h.renderError(r, http.StatusBadRequest, "INVALID_TARGET", err.Error())
 	}
 
+	// Read optional overlay files
+	var preOverlay, postOverlay *overlay.Overlay
+	if preFile, _, err := r.FormFile("preOverlay"); err == nil {
+		defer func() { _ = preFile.Close() }()
+		preContent, readErr := io.ReadAll(preFile)
+		if readErr != nil {
+			return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
+				fmt.Sprintf("failed to read pre-conversion overlay: %v", readErr))
+		}
+		if len(preContent) > 0 {
+			preOverlay, err = overlay.ParseOverlay(preContent)
+			if err != nil {
+				return h.renderError(r, http.StatusBadRequest, "INVALID_PRE_OVERLAY",
+					fmt.Sprintf("failed to parse pre-conversion overlay: %v", err))
+			}
+		}
+	}
+	if postFile, _, err := r.FormFile("postOverlay"); err == nil {
+		defer func() { _ = postFile.Close() }()
+		postContent, readErr := io.ReadAll(postFile)
+		if readErr != nil {
+			return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
+				fmt.Sprintf("failed to read post-conversion overlay: %v", readErr))
+		}
+		if len(postContent) > 0 {
+			postOverlay, err = overlay.ParseOverlay(postContent)
+			if err != nil {
+				return h.renderError(r, http.StatusBadRequest, "INVALID_POST_OVERLAY",
+					fmt.Sprintf("failed to parse post-conversion overlay: %v", err))
+			}
+		}
+	}
+
 	// Parse using oastools
-	parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes(input.Content))
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
 	}
 
-	// Convert using parse-once pattern
-	c := converter.New()
-	convertResult, err := c.ConvertParsed(*parseResult, targetVersion)
+	// Build conversion options
+	opts := []converter.Option{
+		converter.WithParsed(*parseResult),
+		converter.WithTargetVersion(targetVersion),
+	}
+	if preOverlay != nil {
+		opts = append(opts, converter.WithPreConversionOverlay(preOverlay))
+	}
+	if postOverlay != nil {
+		opts = append(opts, converter.WithPostConversionOverlay(postOverlay))
+	}
+
+	// Convert using options pattern
+	convertResult, err := converter.ConvertWithOptions(opts...)
 	if err != nil {
 		return h.renderError(r, http.StatusUnprocessableEntity, "CONVERSION_FAILED",
 			fmt.Sprintf("conversion failed: %v", err))
 	}
 
 	// Serialize result in preferred format
-	format := detectFormat(content)
+	format := detectFormat(input.Content)
 	output, err := serializeDocument(convertResult.Document, format)
 	if err != nil {
 		slog.Error("failed to serialize conversion result",

@@ -12,15 +12,45 @@
           hx-indicator="#spinner"
           hx-swap="innerHTML"
           enctype="multipart/form-data">
+
         <div class="form-row">
-            <div class="form-group">
-                <label for="spec">Specification File</label>
-                <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" required>
+            <div class="input-section" data-field="spec">
+                <label>Specification</label>
+                <div class="input-tabs">
+                    <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">File</button>
+                    <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste</button>
+                    <button type="button" class="input-tab" data-mode="url" onclick="switchInputMode(this.closest('.input-section'), 'url')">URL</button>
+                </div>
+                <div class="input-content" data-mode="file">
+                    <input type="file" name="spec" accept=".json,.yaml,.yml" data-required="true" required>
+                </div>
+                <div class="input-content hidden" data-mode="paste">
+                    <textarea name="spec_content" rows="8" placeholder="Paste spec..." disabled></textarea>
+                </div>
+                <div class="input-content hidden" data-mode="url">
+                    <input type="url" name="spec_url" placeholder="https://..." disabled>
+                </div>
+                <input type="hidden" name="spec_mode" value="file">
                 <small>OpenAPI specification (max 2MB)</small>
             </div>
-            <div class="form-group">
-                <label for="overlay">Overlay File</label>
-                <input type="file" id="overlay" name="overlay" accept=".json,.yaml,.yml" required>
+
+            <div class="input-section" data-field="overlay">
+                <label>Overlay</label>
+                <div class="input-tabs">
+                    <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">File</button>
+                    <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste</button>
+                    <button type="button" class="input-tab" data-mode="url" onclick="switchInputMode(this.closest('.input-section'), 'url')">URL</button>
+                </div>
+                <div class="input-content" data-mode="file">
+                    <input type="file" name="overlay" accept=".json,.yaml,.yml" data-required="true" required>
+                </div>
+                <div class="input-content hidden" data-mode="paste">
+                    <textarea name="overlay_content" rows="8" placeholder="Paste overlay..." disabled></textarea>
+                </div>
+                <div class="input-content hidden" data-mode="url">
+                    <input type="url" name="overlay_url" placeholder="https://..." disabled>
+                </div>
+                <input type="hidden" name="overlay_mode" value="file">
                 <small>OpenAPI Overlay document (max 500KB)</small>
             </div>
         </div>
@@ -32,5 +62,51 @@
     </form>
 
     <div id="result"></div>
+
+    <details class="usage-docs">
+        <summary>Usage Examples</summary>
+        <div class="docs-content">
+            <h4>Go Library</h4>
+            <pre><code class="language-go">import "github.com/erraggy/oastools/overlay"
+
+// Apply overlay to specification
+result, err := overlay.Apply("openapi.yaml", "overlay.yaml")
+
+// From parsed documents
+specDoc, _ := parser.Parse("openapi.yaml")
+overlayDoc, _ := overlay.ParseOverlayFile("overlay.yaml")
+result, err := overlay.ApplyParsed(specDoc, overlayDoc)
+
+fmt.Printf("Applied %d actions\n", len(result.AppliedActions))</code></pre>
+
+            <h4>CLI</h4>
+            <pre><code class="language-bash"># Apply overlay
+oastools overlay openapi.yaml overlay.yaml
+
+# Output to file
+oastools overlay openapi.yaml overlay.yaml -o modified.yaml
+
+# Multiple overlays (applied in order)
+oastools overlay openapi.yaml overlay1.yaml overlay2.yaml</code></pre>
+
+            <h4>Overlay Format</h4>
+            <pre><code class="language-yaml">overlay: 1.0.0
+info:
+  title: My Overlay
+  version: 1.0.0
+actions:
+  - target: $.info.title
+    update:
+      title: Updated API Title
+  - target: $.paths['/users'].get
+    update:
+      summary: Get all users</code></pre>
+
+            <p>
+                <a href="https://erraggy.github.io/oastools/packages/overlay/" target="_blank" rel="noopener">Full documentation</a>
+                · <a href="https://pkg.go.dev/github.com/erraggy/oastools/overlay" target="_blank" rel="noopener">pkg.go.dev</a>
+            </p>
+        </div>
+    </details>
 </section>
 {{end}}

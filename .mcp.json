@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "gopls-mcp": {
+      "type": "stdio",
+      "command": "gopls",
+      "args": [
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}

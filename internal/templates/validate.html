@@ -12,11 +12,47 @@
           hx-indicator="#spinner"
           hx-swap="innerHTML"
           enctype="multipart/form-data">
-        <div class="form-group">
-            <label for="spec">Specification File</label>
-            <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" required>
-            <small>Accepts JSON or YAML files up to 2MB</small>
+
+        <div class="input-section" data-field="spec">
+            <label>Specification</label>
+            <div class="input-tabs">
+                <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">Upload File</button>
+                <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste Content</button>
+                <button type="button" class="input-tab" data-mode="url" onclick="switchInputMode(this.closest('.input-section'), 'url')">Fetch URL</button>
+            </div>
+            <div class="input-content" data-mode="file">
+                <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" data-required="true" required>
+                <small>Accepts JSON or YAML files up to 2MB</small>
+            </div>
+            <div class="input-content hidden" data-mode="paste">
+                <textarea name="spec_content" rows="12" placeholder="Paste your OpenAPI specification here (JSON or YAML)..." disabled></textarea>
+                <small>Paste JSON or YAML content directly</small>
+            </div>
+            <div class="input-content hidden" data-mode="url">
+                <input type="url" name="spec_url" placeholder="https://example.com/openapi.yaml" disabled>
+                <small>Fetch specification from a public URL</small>
+            </div>
+            <input type="hidden" name="input_mode" value="file">
         </div>
+
+        <details class="advanced-options">
+            <summary>Advanced Options</summary>
+            <div class="advanced-content">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="strict">
+                        Strict mode (treat warnings as errors)
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="includeWarnings" checked>
+                        Include best practice warnings
+                    </label>
+                </div>
+            </div>
+        </details>
+
         <button type="submit" class="btn">
             Validate
             <span id="spinner" class="spinner htmx-indicator"></span>
@@ -24,5 +60,41 @@
     </form>
 
     <div id="result"></div>
+
+    <details class="usage-docs">
+        <summary>Usage Examples</summary>
+        <div class="docs-content">
+            <h4>Go Library</h4>
+            <pre><code class="language-go">import "github.com/erraggy/oastools/validator"
+
+// Simple validation
+result, err := validator.Validate("openapi.yaml")
+
+// With options
+result, err := validator.ValidateWithOptions(
+    validator.WithFilePath("openapi.yaml"),
+    validator.WithStrictMode(true),
+    validator.WithIncludeWarnings(true),
+)
+
+fmt.Printf("Valid: %t, Errors: %d, Warnings: %d\n",
+    result.Valid, result.ErrorCount, result.WarningCount)</code></pre>
+
+            <h4>CLI</h4>
+            <pre><code class="language-bash"># Basic validation
+oastools validate openapi.yaml
+
+# Strict mode (fail on warnings)
+oastools validate --strict openapi.yaml
+
+# Validate from URL
+oastools validate https://api.example.com/openapi.yaml</code></pre>
+
+            <p>
+                <a href="https://erraggy.github.io/oastools/packages/validator/" target="_blank" rel="noopener">Full documentation</a>
+                · <a href="https://pkg.go.dev/github.com/erraggy/oastools/validator" target="_blank" rel="noopener">pkg.go.dev</a>
+            </p>
+        </div>
+    </details>
 </section>
 {{end}}

@@ -52,6 +52,6 @@ jobs:
 
             Post your review using `gh pr comment`. Be concise and actionable.
             Only post GitHub comments - don't submit review text as messages.
-          claude_args: "--model opus --allowedTools 'Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(make:*),Bash(go:*)'"
+          claude_args: "--model opus"
           additional_permissions: |
             actions: read

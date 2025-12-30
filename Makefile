@@ -1,4 +1,5 @@
-.PHONY: build test lint run clean docker-build start stop restart status dev tidy
+.PHONY: build test lint run clean docker-build start stop restart status dev tidy help
+.PHONY: check fmt vet verify-templates verify-static logs
 
 VERSION ?= dev
 BINARY_NAME := oastools-web
@@ -9,16 +10,73 @@ LOG_FILE := $(BUILD_DIR)/server.log
 # Build flags
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
+# =============================================================================
+# Build Targets
+# =============================================================================
+
 build:
+	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/server
 
+# =============================================================================
+# Code Quality Targets
+# =============================================================================
+
+## test: Run tests with race detector and coverage
 test:
+	@echo "Running tests..."
 	go test -race -cover ./...
 
+## lint: Run golangci-lint
 lint:
+	@echo "Running linter..."
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed"; exit 1; }
 	golangci-lint run ./...
+
+## fmt: Format Go code
+fmt:
+	@echo "Formatting code..."
+	go fmt ./...
+
+## vet: Run go vet
+vet:
+	@echo "Running go vet..."
+	go vet ./...
+
+## tidy: Tidy go modules
+tidy:
+	@echo "Tidying go modules..."
+	go mod tidy
+
+## verify-templates: Verify Go templates parse correctly (via build)
+verify-templates:
+	@echo "Verifying templates..."
+	@go build -o /dev/null ./cmd/server
+	@echo "Templates OK"
+
+## verify-static: Verify static assets exist and are valid
+verify-static:
+	@echo "Verifying static assets..."
+	@test -f static/css/style.css || { echo "Missing: static/css/style.css"; exit 1; }
+	@test -f static/js/app.js || { echo "Missing: static/js/app.js"; exit 1; }
+	@echo "Static assets OK"
+
+## check: Run all checks before pushing (tidy, fmt, vet, lint, test, build, verify)
+check: tidy fmt vet lint test build verify-templates verify-static
+	@echo ""
+	@echo "============================================"
+	@echo "All checks passed!"
+	@echo "============================================"
+	@echo ""
+	@echo "Git status:"
+	@git status --short
+	@echo ""
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "⚠️  Uncommitted changes detected (review above)"; \
+	else \
+		echo "✓ Working tree clean"; \
+	fi
 
 # Run server in foreground (blocking)
 run: build
@@ -80,10 +138,27 @@ logs:
 		echo "No log file found. Start server with 'make start'"; \
 	fi
 
-# Development helpers
+# =============================================================================
+# Development Helpers
+# =============================================================================
+
+## dev: Run with hot reload (requires air)
 dev:
 	@command -v air >/dev/null 2>&1 || { echo "air not installed: go install github.com/air-verse/air@latest"; exit 1; }
 	air
 
-tidy:
-	go mod tidy
+# =============================================================================
+# Help
+# =============================================================================
+
+## help: Show this help message
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/ /'
+	@echo ""
+	@echo "Quick Start:"
+	@echo "  make check    # Run all checks before pushing"
+	@echo "  make run      # Build and run server"
+	@echo "  make dev      # Run with hot reload"

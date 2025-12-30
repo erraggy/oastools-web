@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -53,21 +52,18 @@ type ErrorDetail struct {
 func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builder.Response {
 	r := req.HTTPRequest
 
-	// Get file from multipart form
-	file, _, err := r.FormFile("spec")
-	if err != nil {
-		return h.renderError(r, http.StatusBadRequest, "MISSING_FILE", "spec file is required")
+	// Read input from any supported mode (file, paste, URL)
+	input, errResp := h.readInput(r, "spec")
+	if errResp != nil {
+		return errResp
 	}
-	defer file.Close()
 
-	content, err := io.ReadAll(file)
-	if err != nil {
-		return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
-			fmt.Sprintf("failed to read file: %v", err))
-	}
+	// Parse options
+	strict := r.FormValue("strict") == "on"
+	includeWarnings := r.FormValue("includeWarnings") != "off" // Default to true (checked by default)
 
 	// Parse using oastools
-	parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes(input.Content))
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
@@ -75,6 +71,8 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 
 	// Validate using parse-once pattern
 	v := validator.New()
+	v.StrictMode = strict
+	v.IncludeWarnings = includeWarnings
 	validationResult, err := v.ValidateParsed(*parseResult)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "VALIDATION_FAILED",
@@ -82,7 +80,7 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 	}
 
 	// Build response
-	result := h.buildValidateResponse(parseResult, validationResult)
+	result := h.buildValidateResponse(validationResult)
 
 	// Content negotiation
 	if wantsHTML(r) {
@@ -92,7 +90,7 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 	return builder.JSON(http.StatusOK, result)
 }
 
-func (h *Handler) buildValidateResponse(parseResult *parser.ParseResult, valResult *validator.ValidationResult) ValidateResponse {
+func (h *Handler) buildValidateResponse(valResult *validator.ValidationResult) ValidateResponse {
 	errors := make([]ValidationIssue, 0, len(valResult.Errors))
 	for _, e := range valResult.Errors {
 		errors = append(errors, ValidationIssue{
