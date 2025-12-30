@@ -1,0 +1,35 @@
+{{template "base" .}}
+
+{{define "title"}}Diff - oastools{{end}}
+
+{{define "content"}}
+<section class="operation-page">
+    <h1>Compare OpenAPI Specifications</h1>
+    <p>Compare two specifications and identify breaking changes.</p>
+
+    <form hx-post="/api/diff"
+          hx-target="#result"
+          hx-indicator="#spinner"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="base">Base Specification (before)</label>
+                <input type="file" id="base" name="base" accept=".json,.yaml,.yml" required>
+                <small>The original/older specification</small>
+            </div>
+            <div class="form-group">
+                <label for="head">Head Specification (after)</label>
+                <input type="file" id="head" name="head" accept=".json,.yaml,.yml" required>
+                <small>The new/modified specification</small>
+            </div>
+        </div>
+        <button type="submit" class="btn">
+            Compare Specifications
+            <span id="spinner" class="spinner htmx-indicator"></span>
+        </button>
+    </form>
+
+    <div id="result"></div>
+</section>
+{{end}}

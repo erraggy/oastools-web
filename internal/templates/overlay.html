@@ -1,0 +1,36 @@
+{{template "base" .}}
+
+{{define "title"}}Overlay - oastools{{end}}
+
+{{define "content"}}
+<section class="operation-page">
+    <h1>Apply OpenAPI Overlay</h1>
+    <p>Apply OpenAPI Overlay transformations to your specification.</p>
+
+    <form hx-post="/api/overlay"
+          hx-target="#result"
+          hx-indicator="#spinner"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="spec">Specification File</label>
+                <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" required>
+                <small>OpenAPI specification (max 2MB)</small>
+            </div>
+            <div class="form-group">
+                <label for="overlay">Overlay File</label>
+                <input type="file" id="overlay" name="overlay" accept=".json,.yaml,.yml" required>
+                <small>OpenAPI Overlay document (max 500KB)</small>
+            </div>
+        </div>
+
+        <button type="submit" class="btn">
+            Apply Overlay
+            <span id="spinner" class="spinner htmx-indicator"></span>
+        </button>
+    </form>
+
+    <div id="result"></div>
+</section>
+{{end}}

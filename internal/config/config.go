@@ -23,8 +23,8 @@ func Load() *Config {
 	return &Config{
 		Port:                  getEnv("PORT", "8080"),
 		LogLevel:              parseLogLevel(getEnv("LOG_LEVEL", "info")),
-		RateLimitRPM:          getEnvInt("RATE_LIMIT_RPM", 10),
-		RateLimitBurst:        getEnvInt("RATE_LIMIT_BURST", 3),
+		RateLimitRPM:          getEnvInt("RATE_LIMIT_RPM", 60),
+		RateLimitBurst:        getEnvInt("RATE_LIMIT_BURST", 10),
 		MaxFileSize:           getEnvInt64("MAX_FILE_SIZE", 2<<20), // 2MB
 		RequestTimeout:        getEnvDuration("REQUEST_TIMEOUT", 30*time.Second),
 		MaxConcurrentRequests: getEnvInt("MAX_CONCURRENT_REQUESTS", 10),

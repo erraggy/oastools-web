@@ -1,0 +1,38 @@
+{{template "base" .}}
+
+{{define "title"}}Convert - oastools{{end}}
+
+{{define "content"}}
+<section class="operation-page">
+    <h1>Convert OpenAPI Specification</h1>
+    <p>Convert your specification between OpenAPI versions: 2.0, 3.0, 3.1, and 3.2.</p>
+
+    <form hx-post="/api/convert"
+          hx-target="#result"
+          hx-indicator="#spinner"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="spec">Specification File</label>
+            <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" required>
+            <small>Accepts JSON or YAML files up to 2MB</small>
+        </div>
+        <div class="form-group">
+            <label for="target">Target Version</label>
+            <select id="target" name="target" required>
+                <option value="">Select target version...</option>
+                <option value="2.0">Swagger 2.0</option>
+                <option value="3.0">OpenAPI 3.0</option>
+                <option value="3.1">OpenAPI 3.1</option>
+                <option value="3.2">OpenAPI 3.2</option>
+            </select>
+        </div>
+        <button type="submit" class="btn">
+            Convert
+            <span id="spinner" class="spinner htmx-indicator"></span>
+        </button>
+    </form>
+
+    <div id="result"></div>
+</section>
+{{end}}

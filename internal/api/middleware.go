@@ -103,8 +103,15 @@ func (rl *RateLimiter) cleanup() {
 }
 
 // Middleware returns an HTTP middleware that enforces rate limits.
+// Static files and health checks are excluded from rate limiting.
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip rate limiting for static files and health checks
+		if strings.HasPrefix(r.URL.Path, "/static/") || r.URL.Path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		ip := realIP(r)
 		limiter := rl.getVisitor(ip)
 
@@ -242,6 +249,18 @@ func ConcurrencyLimiter(maxConcurrent int) func(http.Handler) http.Handler {
 				)
 				http.Error(w, "server busy", http.StatusServiceUnavailable)
 			}
+		})
+	}
+}
+
+// StaticCache wraps a handler to add Cache-Control headers for static assets.
+// Uses immutable caching since embedded files only change on deployment.
+func StaticCache(maxAge time.Duration) func(http.Handler) http.Handler {
+	cacheControl := fmt.Sprintf("public, max-age=%d, immutable", int(maxAge.Seconds()))
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", cacheControl)
+			next.ServeHTTP(w, r)
 		})
 	}
 }

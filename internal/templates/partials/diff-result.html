@@ -1,0 +1,51 @@
+{{define "diff-result.html"}}
+<div class="result">
+    <div class="result-header">
+        <h2>Comparison Result</h2>
+        {{if gt .Summary.Breaking 0}}
+        <span class="badge badge-error">{{.Summary.Breaking}} breaking changes</span>
+        {{else}}
+        <span class="badge badge-success">No breaking changes</span>
+        {{end}}
+    </div>
+
+    <p class="version-info">
+        Comparing <strong>{{.BaseVersion}}</strong> &rarr; <strong>{{.HeadVersion}}</strong>
+    </p>
+
+    <div class="stats-section">
+        <h3>Summary</h3>
+        <dl class="stats-grid">
+            <dt>Total Changes</dt>
+            <dd>{{.Summary.Total}}</dd>
+            <dt>Breaking</dt>
+            <dd class="stat-breaking">{{.Summary.Breaking}}</dd>
+            <dt>Warnings</dt>
+            <dd class="stat-warning">{{.Summary.Warnings}}</dd>
+            <dt>Info</dt>
+            <dd class="stat-info">{{.Summary.Info}}</dd>
+        </dl>
+    </div>
+
+    {{if .Changes}}
+    <div class="issues-section">
+        <h3>Changes ({{len .Changes}})</h3>
+        <ul class="issue-list">
+            {{range .Changes}}
+            <li class="issue-item issue-{{.Severity}}">
+                <div class="change-header">
+                    <code class="issue-path">{{.Path}}</code>
+                    <span class="change-type change-type-{{.Type}}">{{.Type}}</span>
+                    <span class="change-category">{{.Category}}</span>
+                    <span class="badge badge-{{.Severity}} badge-small">{{.Severity}}</span>
+                </div>
+                <p class="issue-message">{{.Message}}</p>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{else}}
+    <p class="success-message">No differences found between the specifications.</p>
+    {{end}}
+</div>
+{{end}}

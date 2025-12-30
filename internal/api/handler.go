@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/erraggy/oastools-web/internal/config"
 	"github.com/erraggy/oastools-web/internal/templates"
@@ -19,7 +21,8 @@ import (
 type Handler struct {
 	cfg         *config.Config
 	version     string
-	templates   *template.Template
+	templates   map[string]*template.Template // page name -> cloned template with that page's blocks
+	partials    *template.Template            // shared partials for result rendering
 	rateLimiter *RateLimiter
 	server      *builder.ServerResult
 	handler     http.Handler
@@ -28,19 +31,51 @@ type Handler struct {
 
 // NewHandler creates a new Handler with the given configuration.
 func NewHandler(cfg *config.Config, version string) (*Handler, error) {
-	tmpl, err := template.ParseFS(templates.FS, "*.html", "partials/*.html")
+	// Parse base template
+	base, err := template.ParseFS(templates.FS, "base.html")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse base template: %w", err)
 	}
 
-	staticSub, _ := fs.Sub(static.FS, ".")
+	// Parse partials for result rendering
+	partials, err := template.ParseFS(templates.FS, "partials/*.html")
+	if err != nil {
+		return nil, fmt.Errorf("parse partials: %w", err)
+	}
+
+	// Parse each page template into a cloned base to avoid block collisions
+	pageTemplates := make(map[string]*template.Template)
+	pages := []string{"index.html", "validate.html", "convert.html", "diff.html", "fix.html", "join.html", "overlay.html"}
+	for _, page := range pages {
+		// Clone base template so each page gets its own copy
+		clone, err := base.Clone()
+		if err != nil {
+			return nil, fmt.Errorf("clone base for %s: %w", page, err)
+		}
+		// Parse page template into the clone
+		_, err = clone.ParseFS(templates.FS, page)
+		if err != nil {
+			return nil, fmt.Errorf("parse page %s: %w", page, err)
+		}
+		pageTemplates[page] = clone
+	}
+
+	staticSub, err := fs.Sub(static.FS, ".")
+	if err != nil {
+		return nil, fmt.Errorf("failed to access static files: %w", err)
+	}
+
+	// Wrap static file server with caching headers (1 year cache, immutable)
+	staticHandler := http.StripPrefix("/static/", http.FileServer(http.FS(staticSub)))
+	cachedStaticHandler := StaticCache(365 * 24 * time.Hour)(staticHandler)
 
 	h := &Handler{
 		cfg:         cfg,
 		version:     version,
-		templates:   tmpl,
+		templates:   pageTemplates,
+		partials:    partials,
 		rateLimiter: NewRateLimiter(cfg.RateLimitRPM, cfg.RateLimitBurst),
-		staticFS:    http.StripPrefix("/static/", http.FileServer(http.FS(staticSub))),
+		staticFS:    cachedStaticHandler,
 	}
 
 	srv := h.buildServer()
@@ -137,8 +172,22 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the page-specific template (each page has its own cloned base)
+	tmpl, ok := h.templates[templateName]
+	if !ok {
+		slog.Error("template not found", "template", templateName)
+		http.Error(w, "template not found", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := h.templates.ExecuteTemplate(w, templateName, data); err != nil {
+	// Execute the page template - it calls {{template "base" .}} which uses this page's block definitions
+	if err := tmpl.ExecuteTemplate(w, templateName, data); err != nil {
+		slog.Error("page template execution failed",
+			"template", templateName,
+			"path", r.URL.Path,
+			"error", err,
+		)
 		http.Error(w, "template error", http.StatusInternalServerError)
 	}
 }

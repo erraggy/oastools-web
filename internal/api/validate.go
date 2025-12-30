@@ -51,56 +51,41 @@ type ErrorDetail struct {
 }
 
 func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+
 	// Get file from multipart form
-	file, _, err := req.HTTPRequest.FormFile("spec")
+	file, _, err := r.FormFile("spec")
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "MISSING_FILE",
-				Message: "spec file is required",
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "MISSING_FILE", "spec file is required")
 	}
 	defer file.Close()
 
 	content, err := io.ReadAll(file)
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "READ_FAILED",
-				Message: fmt.Sprintf("failed to read file: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
+			fmt.Sprintf("failed to read file: %v", err))
 	}
 
 	// Parse using oastools
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "PARSE_FAILED",
-				Message: fmt.Sprintf("failed to parse specification: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
+			fmt.Sprintf("failed to parse specification: %v", err))
 	}
 
 	// Validate using parse-once pattern
 	v := validator.New()
 	validationResult, err := v.ValidateParsed(*parseResult)
 	if err != nil {
-		return builder.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrorDetail{
-				Code:    "VALIDATION_FAILED",
-				Message: fmt.Sprintf("validation error: %v", err),
-			},
-		})
+		return h.renderError(r, http.StatusBadRequest, "VALIDATION_FAILED",
+			fmt.Sprintf("validation error: %v", err))
 	}
 
 	// Build response
 	result := h.buildValidateResponse(parseResult, validationResult)
 
 	// Content negotiation
-	if wantsHTML(req.HTTPRequest) {
+	if wantsHTML(r) {
 		return h.renderHTML("validation-result.html", result)
 	}
 

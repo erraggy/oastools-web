@@ -1,0 +1,66 @@
+{{define "join-result.html"}}
+<div class="result">
+    <div class="result-header">
+        <h2>Join Result</h2>
+        <span class="badge badge-success">{{.FileCount}} specs merged</span>
+    </div>
+
+    <p class="version-info">Output Version: <strong>{{.Version}}</strong></p>
+
+    {{if gt .CollisionCount 0}}
+    <div class="stats-section">
+        <p><strong>{{.CollisionCount}}</strong> collisions were resolved during merging.</p>
+    </div>
+    {{end}}
+
+    {{if .Warnings}}
+    <div class="issues-section">
+        <h3>Warnings ({{len .Warnings}})</h3>
+        <ul class="issue-list">
+            {{range .Warnings}}
+            <li class="issue-item issue-warning">
+                <p class="issue-message">{{.}}</p>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{else}}
+    <p class="success-message">No issues occurred during the merge.</p>
+    {{end}}
+
+    <div class="output-section">
+        <div class="output-header">
+            <h3>Merged Specification</h3>
+            <div class="output-actions">
+                <button type="button" class="btn btn-small" onclick="copyToClipboard()">Copy</button>
+                <button type="button" class="btn btn-small" onclick="downloadSpec()">Download</button>
+            </div>
+        </div>
+        <pre class="code-output"><code id="spec-output">{{.Result}}</code></pre>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const text = document.getElementById('spec-output').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
+
+function downloadSpec() {
+    const text = document.getElementById('spec-output').textContent;
+    const format = '{{.Format}}';
+    const ext = format === 'json' ? 'json' : 'yaml';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'merged-spec.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+</script>
+{{end}}
