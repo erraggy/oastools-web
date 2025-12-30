@@ -49,5 +49,3 @@ images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$SHORT_SHA'
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:latest'
 
-options:
-  logging: CLOUD_LOGGING_ONLY
