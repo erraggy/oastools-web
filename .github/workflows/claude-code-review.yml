@@ -39,13 +39,19 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
             Review this pull request for:
             - Code quality and Go best practices
             - Potential bugs or edge cases
             - Security concerns (especially for web handlers)
             - Consistency with existing codebase patterns
 
-            Focus on actionable feedback. Be concise.
-          claude_args: "--model opus --allowedTools 'Bash(gh:*)'"
+            The PR branch is already checked out. Use `gh pr diff` to see changes.
+
+            Post your review using `gh pr comment`. Be concise and actionable.
+            Only post GitHub comments - don't submit review text as messages.
+          claude_args: "--model opus --allowedTools 'Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(make:*),Bash(go:*)'"
           additional_permissions: |
             actions: read
