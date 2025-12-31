@@ -1,11 +1,11 @@
 steps:
-  # Get version from git describe (fetch tags first since Cloud Build uses shallow clone)
+  # Get version from git describe (unshallow and fetch tags since Cloud Build uses shallow clone)
   - name: 'gcr.io/cloud-builders/git'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        git fetch --tags
+        git fetch --unshallow --tags 2>/dev/null || git fetch --tags
         APP_VERSION=$$(git describe --tags --always)
         echo "Detected version: $$APP_VERSION"
         echo "$$APP_VERSION" > /workspace/version.txt
