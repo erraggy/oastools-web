@@ -31,7 +31,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Run Claude Code
         id: claude
@@ -52,6 +52,5 @@ jobs:
 
             Post your review using `gh pr comment`. Be concise and actionable.
             Only post GitHub comments - don't submit review text as messages.
-          claude_args: "--model opus"
           additional_permissions: |
             actions: read
