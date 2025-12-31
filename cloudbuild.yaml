@@ -4,7 +4,11 @@ steps:
     entrypoint: 'bash'
     args:
       - '-c'
-      - 'git fetch --tags && git describe --tags --always > /workspace/version.txt'
+      - |
+        git fetch --tags
+        VERSION=$(git describe --tags --always)
+        echo "Detected version: $VERSION"
+        echo "$VERSION" > /workspace/version.txt
 
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
@@ -13,11 +17,12 @@ steps:
       - '-c'
       - |
         VERSION=$(cat /workspace/version.txt)
+        echo "Building with VERSION=$VERSION"
         docker build \
-          -t us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$$VERSION \
+          -t us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$VERSION \
           -t us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$SHORT_SHA \
           -t us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:latest \
-          --build-arg VERSION=$$VERSION \
+          --build-arg VERSION=$VERSION \
           .
 
   # Push to Artifact Registry
