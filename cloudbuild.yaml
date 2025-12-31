@@ -1,10 +1,10 @@
 steps:
-  # Get version from git describe
+  # Get version from git describe (fetch tags first since Cloud Build uses shallow clone)
   - name: 'gcr.io/cloud-builders/git'
     entrypoint: 'bash'
     args:
       - '-c'
-      - 'git describe --tags --always > /workspace/version.txt'
+      - 'git fetch --tags && git describe --tags --always > /workspace/version.txt'
 
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
