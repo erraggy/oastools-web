@@ -13,7 +13,6 @@ import (
 	"github.com/erraggy/oastools-web/internal/templates"
 	"github.com/erraggy/oastools-web/static"
 
-	"github.com/erraggy/oastools"
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/parser"
 )
@@ -72,7 +71,7 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 	staticHandler := http.StripPrefix("/static/", http.FileServer(http.FS(staticSub)))
 	cachedStaticHandler := StaticCache(365 * 24 * time.Hour)(staticHandler)
 
-	oastoolsVersion := oastools.Version()
+	oastoolsVersion := getOASToolsVersion()
 
 	h := &Handler{
 		cfg:             cfg,
