@@ -1,4 +1,4 @@
-.PHONY: build test lint lint-css lint-js run clean docker-build start stop restart status dev tidy help
+.PHONY: build test lint lint-css lint-js lint-yaml lint-json run clean docker-build start stop restart status dev tidy help
 .PHONY: check fmt vet verify-templates verify-static logs
 
 VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo "dev")
@@ -42,7 +42,20 @@ lint-css:
 ## lint-js: Lint JavaScript files
 lint-js:
 	@echo "Running JS linter..."
-	@npx eslint "static/js/**/*.js" --no-config-lookup --rule 'no-unused-vars: warn' --rule 'no-undef: off' 2>/dev/null || true
+	@npx eslint "static/js/**/*.js" --no-config-lookup \
+		--rule 'no-unused-vars: [warn, {varsIgnorePattern: "^(switchInputMode|copyToClipboard|downloadAsFile|addFileInput|removeFileInput)$$"}]' \
+		--rule 'no-undef: off' 2>/dev/null || true
+
+## lint-yaml: Lint YAML configuration files
+lint-yaml:
+	@echo "Linting YAML files..."
+	@python3 -m yamllint --version >/dev/null 2>&1 || { echo "yamllint not installed: pip3 install yamllint"; exit 1; }
+	python3 -m yamllint .github/workflows/ cloudbuild.yaml .golangci.yml
+
+## lint-json: Validate JSON configuration files
+lint-json:
+	@echo "Validating JSON files..."
+	@npx jsonlint --quiet package.json
 
 ## fmt: Format Go code
 fmt:
@@ -73,7 +86,7 @@ verify-static:
 	@echo "Static assets OK"
 
 ## check: Run all checks before pushing (tidy, fmt, vet, lint, test, build, verify)
-check: tidy fmt vet lint lint-css lint-js test build verify-templates verify-static
+check: tidy fmt vet lint lint-css lint-js lint-yaml lint-json test build verify-templates verify-static
 	@echo ""
 	@echo "============================================"
 	@echo "All checks passed!"

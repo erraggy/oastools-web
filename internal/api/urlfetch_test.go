@@ -169,6 +169,8 @@ func TestExtractFilenameFromURL(t *testing.T) {
 		{"no filename", "https://example.com/", "remote-spec"},
 		{"trailing slash", "https://example.com/api/", "remote-spec"},
 		{"just host", "https://example.com", "remote-spec"},
+		{"invalid URL", "://invalid", "remote-spec"},
+		{"empty path", "https://example.com", "remote-spec"},
 	}
 
 	for _, tt := range tests {
