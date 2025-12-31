@@ -44,6 +44,3 @@ jobs:
           claude_args: |
             --model=opus
             --allowed-tools "Bash(gh:*)"
-
-          # Optional: Show full output from Claude to debug issues
-          show_full_output: true
