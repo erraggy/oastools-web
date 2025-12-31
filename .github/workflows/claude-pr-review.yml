@@ -8,17 +8,19 @@ jobs:
   review:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write  # Allow Claude to push commits to PRs
       pull-requests: write
+      issues: write
       id-token: write
-      actions: read
+      actions: read # Required for Claude to read CI results on PRs
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Run Claude Code
+        id: claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -32,4 +34,16 @@ jobs:
             - Consistency with existing codebase patterns
 
             Be concise and actionable.
-          claude_args: --model opus --max-turns 10
+
+          # This is an optional setting that allows Claude to read CI results on PRs
+          additional_permissions: |
+            actions: read
+
+          # Model and tool configuration
+          # Custom instructions are read from CLAUDE.md and AGENTS.md in the repo
+          claude_args: |
+            --model=opus
+            --allowed-tools "Bash(gh:*)"
+
+          # Optional: Show full output from Claude to debug issues
+          show_full_output: true
