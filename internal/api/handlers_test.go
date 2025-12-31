@@ -13,6 +13,8 @@ import (
 
 	"github.com/erraggy/oastools-web/internal/config"
 	"github.com/erraggy/oastools/builder"
+	"github.com/erraggy/oastools/parser"
+	"github.com/erraggy/oastools/validator"
 )
 
 // =============================================================================
@@ -314,6 +316,211 @@ func TestHandler_handleValidate_MissingSpec(t *testing.T) {
 
 	if resp.StatusCode() != http.StatusBadRequest {
 		t.Errorf("got status %d, want 400", resp.StatusCode())
+	}
+}
+
+// =============================================================================
+// URL Input Mode Tests
+// =============================================================================
+
+func TestHandler_URLInputMode_Success(t *testing.T) {
+	// Create a test server that serves a valid OpenAPI spec
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(validOpenAPI30))
+	}))
+	defer server.Close()
+
+	h := minimalHandler(t)
+	h.urlFetcher = newTestURLFetcher() // Uses skipHostCheck for localhost tests
+
+	// Create a request with URL input mode
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	_ = writer.WriteField("input_mode", "url")
+	_ = writer.WriteField("spec_url", server.URL+"/openapi.yaml")
+	_ = writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/validate", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := req.ParseMultipartForm(32 << 20); err != nil {
+		t.Fatalf("failed to parse form: %v", err)
+	}
+
+	resp := h.handleValidate(context.Background(), createHandlerRequest(req))
+
+	if resp.StatusCode() != http.StatusOK {
+		t.Errorf("got status %d, want 200", resp.StatusCode())
+	}
+
+	body, ok := resp.Body().(ValidateResponse)
+	if !ok {
+		t.Fatal("body should be ValidateResponse")
+	}
+	if !body.Valid {
+		t.Error("expected valid=true")
+	}
+}
+
+func TestHandler_URLInputMode_MissingURL(t *testing.T) {
+	h := minimalHandler(t)
+	h.urlFetcher = newTestURLFetcher()
+
+	// Create a request with URL input mode but no URL provided
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	_ = writer.WriteField("input_mode", "url")
+	// Note: spec_url is NOT provided
+	_ = writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/validate", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := req.ParseMultipartForm(32 << 20); err != nil {
+		t.Fatalf("failed to parse form: %v", err)
+	}
+
+	resp := h.handleValidate(context.Background(), createHandlerRequest(req))
+
+	if resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("got status %d, want 400", resp.StatusCode())
+	}
+}
+
+func TestHandler_URLInputMode_FetchError(t *testing.T) {
+	// Create a test server that returns an error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	h := minimalHandler(t)
+	h.urlFetcher = newTestURLFetcher()
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	_ = writer.WriteField("input_mode", "url")
+	_ = writer.WriteField("spec_url", server.URL+"/notfound.yaml")
+	_ = writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/validate", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := req.ParseMultipartForm(32 << 20); err != nil {
+		t.Fatalf("failed to parse form: %v", err)
+	}
+
+	resp := h.handleValidate(context.Background(), createHandlerRequest(req))
+
+	if resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("got status %d, want 400", resp.StatusCode())
+	}
+}
+
+func TestHandler_URLInputMode_SizeLimit(t *testing.T) {
+	// Create content that is under URLFetcher's 2MB limit but larger than handler's limit
+	// Use 100KB of content
+	largeContent := "openapi: '3.0.0'\ninfo:\n  title: Test\n  version: '1.0'\npaths: {}\n" + strings.Repeat("x", 100<<10) // 100KB
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(largeContent))
+	}))
+	defer server.Close()
+
+	h := minimalHandler(t)
+	h.urlFetcher = newTestURLFetcher()
+	// Set a small max file size to trigger the handler's size check
+	h.cfg.MaxFileSize = 50 << 10 // 50KB - smaller than our 100KB content
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	_ = writer.WriteField("input_mode", "url")
+	_ = writer.WriteField("spec_url", server.URL+"/large.yaml")
+	_ = writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/validate", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := req.ParseMultipartForm(32 << 20); err != nil {
+		t.Fatalf("failed to parse form: %v", err)
+	}
+
+	resp := h.handleValidate(context.Background(), createHandlerRequest(req))
+
+	// Should fail because content exceeds handler's max file size (50KB)
+	if resp.StatusCode() != http.StatusRequestEntityTooLarge {
+		t.Errorf("got status %d, want 413", resp.StatusCode())
+	}
+}
+
+func TestHandler_URLInputMode_InvalidMode(t *testing.T) {
+	h := minimalHandler(t)
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	_ = writer.WriteField("input_mode", "invalid_mode")
+	_ = writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/validate", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := req.ParseMultipartForm(32 << 20); err != nil {
+		t.Fatalf("failed to parse form: %v", err)
+	}
+
+	resp := h.handleValidate(context.Background(), createHandlerRequest(req))
+
+	if resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("got status %d, want 400", resp.StatusCode())
+	}
+}
+
+// =============================================================================
+// buildValidateResponse Tests
+// =============================================================================
+
+func TestHandler_buildValidateResponse_WithWarnings(t *testing.T) {
+	h := minimalHandler(t)
+
+	// Create a mock validation result with both errors and warnings
+	result := &validator.ValidationResult{
+		Valid:   false,
+		Version: "3.0.0",
+		Errors: []validator.ValidationError{
+			{Path: "/paths/test", Message: "test error"},
+		},
+		Warnings: []validator.ValidationError{
+			{Path: "/info", Message: "test warning"},
+		},
+		ErrorCount:   1,
+		WarningCount: 1,
+		Stats: parser.DocumentStats{
+			PathCount:      5,
+			OperationCount: 10,
+			SchemaCount:    3,
+		},
+	}
+
+	resp := h.buildValidateResponse(result)
+
+	if resp.Valid {
+		t.Error("expected Valid=false")
+	}
+	if len(resp.Errors) != 1 {
+		t.Errorf("expected 1 error, got %d", len(resp.Errors))
+	}
+	if len(resp.Warnings) != 1 {
+		t.Errorf("expected 1 warning, got %d", len(resp.Warnings))
+	}
+	if resp.Warnings[0].Severity != "warning" {
+		t.Errorf("expected severity 'warning', got %q", resp.Warnings[0].Severity)
+	}
+	if resp.Statistics.Paths != 5 {
+		t.Errorf("expected 5 paths, got %d", resp.Statistics.Paths)
 	}
 }
 
@@ -757,6 +964,93 @@ func TestHandler_handleOverlay(t *testing.T) {
 
 			if resp.StatusCode() != tt.wantStatus {
 				t.Errorf("got status %d, want %d", resp.StatusCode(), tt.wantStatus)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// handleSpec Tests
+// =============================================================================
+
+func TestHandler_handleSpec(t *testing.T) {
+	// Create a minimal spec for testing
+	spec := map[string]any{
+		"openapi": "3.0.0",
+		"info": map[string]any{
+			"title":   "Test API",
+			"version": "1.0.0",
+		},
+		"paths": map[string]any{},
+	}
+
+	h := &Handler{
+		server: &builder.ServerResult{
+			Spec: spec,
+		},
+	}
+
+	tests := []struct {
+		name        string
+		accept      string
+		wantStatus  int
+		wantContent string // substring to check in response
+	}{
+		{
+			name:        "default returns YAML",
+			accept:      "",
+			wantStatus:  http.StatusOK,
+			wantContent: "openapi:",
+		},
+		{
+			name:        "Accept text/html returns YAML",
+			accept:      "text/html",
+			wantStatus:  http.StatusOK,
+			wantContent: "openapi:",
+		},
+		{
+			name:        "Accept application/json returns JSON",
+			accept:      "application/json",
+			wantStatus:  http.StatusOK,
+			wantContent: `"openapi"`,
+		},
+		{
+			name:        "Accept with multiple types including JSON",
+			accept:      "text/html, application/json",
+			wantStatus:  http.StatusOK,
+			wantContent: `"openapi"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/spec", nil)
+			if tt.accept != "" {
+				req.Header.Set("Accept", tt.accept)
+			}
+
+			resp := h.handleSpec(context.Background(), createHandlerRequest(req))
+
+			if resp.StatusCode() != tt.wantStatus {
+				t.Errorf("got status %d, want %d", resp.StatusCode(), tt.wantStatus)
+			}
+
+			// Check the response body contains expected content
+			body := resp.Body()
+			var bodyStr string
+			switch v := body.(type) {
+			case []byte:
+				bodyStr = string(v)
+			case string:
+				bodyStr = v
+			default:
+				// For JSON responses, the body might be the spec map directly
+				// In this case, we just verify the status code is correct
+				return
+			}
+
+			if !strings.Contains(bodyStr, tt.wantContent) {
+				t.Errorf("response body %q does not contain %q", bodyStr, tt.wantContent)
 			}
 		})
 	}

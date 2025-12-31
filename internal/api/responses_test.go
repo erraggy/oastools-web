@@ -1,6 +1,7 @@
 package api
 
 import (
+	"html/template"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -105,6 +106,15 @@ func TestSerializeDocument(t *testing.T) {
 		}
 		if result != "{}" {
 			t.Errorf("empty doc should serialize to {}, got: %s", result)
+		}
+	})
+
+	t.Run("JSON marshal error", func(t *testing.T) {
+		// Channels cannot be marshaled to JSON
+		badDoc := map[string]any{"channel": make(chan int)}
+		_, err := serializeDocument(badDoc, "json")
+		if err == nil {
+			t.Error("expected error for unmarshable type")
 		}
 	})
 }
@@ -296,5 +306,138 @@ func TestParseCollisionStrategy(t *testing.T) {
 			// Just verify it doesn't panic - the function should always return a valid strategy
 			_ = parseCollisionStrategy(tt.input)
 		})
+	}
+}
+
+// =============================================================================
+// renderHTML Tests
+// =============================================================================
+
+func TestRenderHTML_Success(t *testing.T) {
+	partials, err := template.New("partials").Parse(`{{define "test.html"}}Hello {{.Name}}{{end}}`)
+	if err != nil {
+		t.Fatalf("failed to parse template: %v", err)
+	}
+
+	h := &Handler{partials: partials}
+	resp := h.renderHTML("test.html", map[string]string{"Name": "World"})
+
+	if resp.StatusCode() != http.StatusOK {
+		t.Errorf("got status %d, want 200", resp.StatusCode())
+	}
+
+	if body, ok := resp.Body().(string); ok {
+		if body != "Hello World" {
+			t.Errorf("got body %q, want 'Hello World'", body)
+		}
+	} else {
+		t.Error("body should be string")
+	}
+}
+
+func TestRenderHTML_TemplateError(t *testing.T) {
+	// Create a template that references an undefined template
+	partials, err := template.New("partials").Parse(`{{define "exists.html"}}OK{{end}}`)
+	if err != nil {
+		t.Fatalf("failed to parse template: %v", err)
+	}
+
+	h := &Handler{partials: partials}
+	// Try to render a template that doesn't exist
+	resp := h.renderHTML("nonexistent.html", nil)
+
+	// Should return 500 error when template execution fails
+	if resp.StatusCode() != http.StatusInternalServerError {
+		t.Errorf("got status %d, want 500", resp.StatusCode())
+	}
+}
+
+// =============================================================================
+// renderError Tests
+// =============================================================================
+
+func TestRenderError_JSONResponse(t *testing.T) {
+	partials, _ := template.New("partials").Parse(`{{define "error"}}Error: {{.Message}}{{end}}`)
+	h := &Handler{partials: partials}
+
+	// Non-HTMX request should get JSON response
+	req := httptest.NewRequest(http.MethodPost, "/api/test", nil)
+	resp := h.renderError(req, http.StatusBadRequest, "TEST_ERROR", "test message")
+
+	if resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("got status %d, want 400", resp.StatusCode())
+	}
+
+	body, ok := resp.Body().(ErrorResponse)
+	if !ok {
+		t.Fatal("body should be ErrorResponse")
+	}
+	if body.Error.Code != "TEST_ERROR" {
+		t.Errorf("got code %q, want TEST_ERROR", body.Error.Code)
+	}
+	if body.Error.Message != "test message" {
+		t.Errorf("got message %q, want 'test message'", body.Error.Message)
+	}
+}
+
+func TestRenderError_HTMLResponse(t *testing.T) {
+	partials, _ := template.New("partials").Parse(`{{define "error"}}Error: {{.Message}}{{end}}`)
+	h := &Handler{partials: partials}
+
+	// HTMX request should get HTML response
+	req := httptest.NewRequest(http.MethodPost, "/api/test", nil)
+	req.Header.Set("HX-Request", "true")
+
+	resp := h.renderError(req, http.StatusBadRequest, "TEST_ERROR", "test message")
+
+	if resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("got status %d, want 400", resp.StatusCode())
+	}
+
+	// Should be htmlResponse type
+	htmlResp, ok := resp.(*htmlResponse)
+	if !ok {
+		t.Fatal("response should be htmlResponse for HTMX request")
+	}
+	if htmlResp.html != "Error: test message" {
+		t.Errorf("got html %q, want 'Error: test message'", htmlResp.html)
+	}
+}
+
+func TestRenderError_ServerError(t *testing.T) {
+	partials, _ := template.New("partials").Parse(`{{define "error"}}Error: {{.Message}}{{end}}`)
+	h := &Handler{partials: partials}
+
+	// Test 500 error (triggers slog.Error instead of slog.Warn)
+	req := httptest.NewRequest(http.MethodPost, "/api/test", nil)
+	resp := h.renderError(req, http.StatusInternalServerError, "INTERNAL_ERROR", "server error")
+
+	if resp.StatusCode() != http.StatusInternalServerError {
+		t.Errorf("got status %d, want 500", resp.StatusCode())
+	}
+
+	body, ok := resp.Body().(ErrorResponse)
+	if !ok {
+		t.Fatal("body should be ErrorResponse")
+	}
+	if body.Error.Code != "INTERNAL_ERROR" {
+		t.Errorf("got code %q, want INTERNAL_ERROR", body.Error.Code)
+	}
+}
+
+func TestRenderError_HTMLTemplateFailure(t *testing.T) {
+	// Create a template that will fail during execution
+	partials, _ := template.New("partials").Parse(`{{define "error"}}{{.NonExistent.Field}}{{end}}`)
+	h := &Handler{partials: partials}
+
+	// HTMX request with failing template should fall back to builder.Error
+	req := httptest.NewRequest(http.MethodPost, "/api/test", nil)
+	req.Header.Set("HX-Request", "true")
+
+	resp := h.renderError(req, http.StatusBadRequest, "TEST_ERROR", "test message")
+
+	// Should return the original status code even when template fails
+	if resp.StatusCode() != http.StatusBadRequest {
+		t.Errorf("got status %d, want 400", resp.StatusCode())
 	}
 }
