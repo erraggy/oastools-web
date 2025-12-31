@@ -9,17 +9,25 @@ on:
     types: [opened, assigned]
   pull_request_review:
     types: [submitted]
-  pull_request:
-    types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Prompt for Claude to execute'
+        required: true
+        type: string
+      pr_number:
+        description: 'PR number to operate on (optional)'
+        required: false
+        type: string
 
 jobs:
   claude:
     if: |
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude'))) ||
-      (github.event_name == 'pull_request')
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -38,20 +46,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
-
-            Review this pull request for:
-            - Code quality and Go best practices
-            - Potential bugs or edge cases
-            - Security concerns (especially for web handlers)
-            - Consistency with existing codebase patterns
-
-            The PR branch is already checked out. Use `gh pr diff` to see changes.
-
-            Post your review using `gh pr comment`. Be concise and actionable.
-            Only post GitHub comments - don't submit review text as messages.
-          claude_args: "--model opus"
+          prompt: ${{ github.event_name == 'workflow_dispatch' && inputs.prompt || '' }}
           additional_permissions: |
             actions: read
+          claude_args: |
+            --model=opus
+            --allowed-tools "Bash(gh:*)"
