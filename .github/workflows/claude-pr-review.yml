@@ -32,4 +32,4 @@ jobs:
             - Consistency with existing codebase patterns
 
             Be concise and actionable.
-          claude_args: --max-turns 10
+          claude_args: --model opus --max-turns 10
