@@ -23,7 +23,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+            Review PR #${{ github.event.pull_request.number }}.
 
             Focus on:
             - Code quality and Go best practices
@@ -31,11 +31,5 @@ jobs:
             - Security concerns (especially for web handlers)
             - Consistency with existing codebase patterns
 
-            Use `gh pr diff ${{ github.event.pull_request.number }}` to see changes.
-            Post your review using `gh pr comment ${{ github.event.pull_request.number }}`.
             Be concise and actionable.
-          claude_args: |
-            --model opus
-            --allowedTools "Bash(gh:*),Read,Glob,Grep"
-          additional_permissions: |
-            actions: read
+          claude_args: --max-turns 10
