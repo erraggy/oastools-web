@@ -35,7 +35,7 @@ jobs:
             Post your review using `gh pr comment ${{ github.event.pull_request.number }}`.
             Be concise and actionable.
           claude_args: |
-            --model=opus
-            --allowed-tools "Bash(gh:*)"
+            --model opus
+            --allowedTools "Bash(gh:*),Read,Glob,Grep"
           additional_permissions: |
             actions: read
