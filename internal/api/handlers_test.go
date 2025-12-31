@@ -391,6 +391,107 @@ func TestHandler_handleConvert(t *testing.T) {
 	}
 }
 
+func TestHandler_handleConvert_WithOverlays(t *testing.T) {
+	h := minimalHandler(t)
+
+	t.Run("convert with valid pre-overlay", func(t *testing.T) {
+		req := createMultipartRequestWithFields(t, "/api/convert",
+			map[string][]byte{
+				"spec":       []byte(validOpenAPI30),
+				"preOverlay": []byte(validOverlay),
+			},
+			map[string]string{"target": "3.1"})
+
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		resp := h.handleConvert(context.Background(), createHandlerRequest(req))
+
+		if resp.StatusCode() != http.StatusOK {
+			t.Errorf("got status %d, want 200", resp.StatusCode())
+		}
+	})
+
+	t.Run("convert with valid post-overlay", func(t *testing.T) {
+		req := createMultipartRequestWithFields(t, "/api/convert",
+			map[string][]byte{
+				"spec":        []byte(validOpenAPI30),
+				"postOverlay": []byte(validOverlay),
+			},
+			map[string]string{"target": "3.1"})
+
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		resp := h.handleConvert(context.Background(), createHandlerRequest(req))
+
+		if resp.StatusCode() != http.StatusOK {
+			t.Errorf("got status %d, want 200", resp.StatusCode())
+		}
+	})
+
+	t.Run("convert with invalid pre-overlay", func(t *testing.T) {
+		req := createMultipartRequestWithFields(t, "/api/convert",
+			map[string][]byte{
+				"spec":       []byte(validOpenAPI30),
+				"preOverlay": []byte(invalidYAML),
+			},
+			map[string]string{"target": "3.1"})
+
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		resp := h.handleConvert(context.Background(), createHandlerRequest(req))
+
+		if resp.StatusCode() != http.StatusBadRequest {
+			t.Errorf("got status %d, want 400", resp.StatusCode())
+		}
+	})
+
+	t.Run("convert with invalid post-overlay", func(t *testing.T) {
+		req := createMultipartRequestWithFields(t, "/api/convert",
+			map[string][]byte{
+				"spec":        []byte(validOpenAPI30),
+				"postOverlay": []byte(invalidYAML),
+			},
+			map[string]string{"target": "3.1"})
+
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		resp := h.handleConvert(context.Background(), createHandlerRequest(req))
+
+		if resp.StatusCode() != http.StatusBadRequest {
+			t.Errorf("got status %d, want 400", resp.StatusCode())
+		}
+	})
+
+	t.Run("convert with HTMX request returns HTML", func(t *testing.T) {
+		req := createMultipartRequestWithFields(t, "/api/convert",
+			map[string][]byte{"spec": []byte(validOpenAPI30)},
+			map[string]string{"target": "3.1"})
+		req.Header.Set("HX-Request", "true")
+
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		resp := h.handleConvert(context.Background(), createHandlerRequest(req))
+
+		if resp.StatusCode() != http.StatusOK {
+			t.Errorf("got status %d, want 200", resp.StatusCode())
+		}
+		// HTML response type check
+		if _, ok := resp.Body().(string); !ok {
+			t.Error("expected HTML string response for HTMX request")
+		}
+	})
+}
+
 // =============================================================================
 // handleDiff Tests
 // =============================================================================
