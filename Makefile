@@ -1,7 +1,7 @@
 .PHONY: build test lint run clean docker-build start stop restart status dev tidy help
 .PHONY: check fmt vet verify-templates verify-static logs
 
-VERSION ?= dev
+VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo "dev")
 BINARY_NAME := oastools-web
 BUILD_DIR := bin
 PID_FILE := $(BUILD_DIR)/.server.pid

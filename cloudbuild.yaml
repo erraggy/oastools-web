@@ -1,15 +1,24 @@
 steps:
+  # Get version from git describe
+  - name: 'gcr.io/cloud-builders/git'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - 'git describe --tags --always > /workspace/version.txt'
+
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
     args:
-      - 'build'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$SHORT_SHA'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:latest'
-      - '--build-arg'
-      - 'VERSION=$SHORT_SHA'
-      - '.'
+      - '-c'
+      - |
+        VERSION=$(cat /workspace/version.txt)
+        docker build \
+          -t us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$$VERSION \
+          -t us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$SHORT_SHA \
+          -t us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:latest \
+          --build-arg VERSION=$$VERSION \
+          .
 
   # Push to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
