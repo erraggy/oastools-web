@@ -19,6 +19,9 @@
   },
   "homepage": "https://github.com/erraggy/oastools-web#readme",
   "devDependencies": {
-    "@playwright/test": "^1.57.0"
+    "@playwright/test": "^1.57.0",
+    "stylelint": "^16.12.0",
+    "stylelint-config-standard": "^36.0.0",
+    "eslint": "^9.17.0"
   }
 }

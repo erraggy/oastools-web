@@ -1,8 +1,8 @@
 :root {
     --color-bg: #fafafa;
-    --color-surface: #ffffff;
+    --color-surface: #fff;
     --color-text: #1a1a1a;
-    --color-text-muted: #666666;
+    --color-text-muted: #666;
     --color-primary: #2563eb;
     --color-primary-hover: #1d4ed8;
     --color-border: #e5e7eb;
@@ -10,7 +10,7 @@
     --color-error: #dc2626;
     --color-warning: #d97706;
     --radius: 8px;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow: 0 1px 3px rgb(0 0 0 / 10%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -301,7 +301,11 @@ pre code.hljs {
 /* Ensure highlight.js theme colors are applied (atom-one-dark) */
 .hljs-keyword { color: #c678dd !important; }
 .hljs-string { color: #98c379 !important; }
-.hljs-comment { color: #5c6370 !important; font-style: italic; }
+
+.hljs-comment {
+    color: #5c6370 !important;
+    font-style: italic;
+}
 .hljs-title { color: #61afef !important; }
 .hljs-built_in { color: #e6c07b !important; }
 .hljs-literal { color: #56b6c2 !important; }
@@ -533,7 +537,7 @@ details.usage-docs[open] summary {
     font-size: 0.8125rem;
     font-weight: 600;
     color: var(--color-text-muted);
-    margin: 1rem 0 0.5rem 0;
+    margin: 1rem 0 0.5rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -543,7 +547,7 @@ details.usage-docs[open] summary {
 }
 
 .docs-content pre {
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.5rem;
 }
 
 .docs-content p {
@@ -575,7 +579,7 @@ small {
     gap: 1rem;
 }
 
-@media (max-width: 640px) {
+@media (width <= 640px) {
     .form-row {
         grid-template-columns: 1fr;
     }
