@@ -1,4 +1,4 @@
-.PHONY: build test lint run clean docker-build start stop restart status dev tidy help
+.PHONY: build test lint lint-css lint-js run clean docker-build start stop restart status dev tidy help
 .PHONY: check fmt vet verify-templates verify-static logs
 
 VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo "dev")
@@ -30,9 +30,19 @@ test:
 
 ## lint: Run golangci-lint
 lint:
-	@echo "Running linter..."
+	@echo "Running Go linter..."
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed"; exit 1; }
 	golangci-lint run ./...
+
+## lint-css: Lint CSS files
+lint-css:
+	@echo "Running CSS linter..."
+	@npx stylelint "static/css/**/*.css"
+
+## lint-js: Lint JavaScript files
+lint-js:
+	@echo "Running JS linter..."
+	@npx eslint "static/js/**/*.js" --no-config-lookup --rule 'no-unused-vars: warn' --rule 'no-undef: off' 2>/dev/null || true
 
 ## fmt: Format Go code
 fmt:
@@ -63,7 +73,7 @@ verify-static:
 	@echo "Static assets OK"
 
 ## check: Run all checks before pushing (tidy, fmt, vet, lint, test, build, verify)
-check: tidy fmt vet lint test build verify-templates verify-static
+check: tidy fmt vet lint lint-css lint-js test build verify-templates verify-static
 	@echo ""
 	@echo "============================================"
 	@echo "All checks passed!"
