@@ -1,38 +1,8 @@
 {
   "errors": [
     {
-      "message": "oas 3.0.3: missing required field 'info.version': Info object must have a version string per spec",
-      "path": "document",
-      "severity": "error"
-    },
-    {
-      "message": "oas 3.0.3: invalid path pattern 'paths.items': path must begin with '/'",
-      "path": "document",
-      "severity": "error"
-    },
-    {
-      "message": "oas 3.0.3: missing required field 'paths.items.get.responses': Operation must have a responses object",
-      "path": "document",
-      "severity": "error"
-    },
-    {
-      "message": "oas 3.0.3: invalid parameter 'paths.items.get.parameters[0]': path parameters must have 'required: true' per spec",
-      "path": "document",
-      "severity": "error"
-    },
-    {
-      "message": "oas 3.0.3: missing required field 'paths.items.get.parameters[1].in': Parameter must specify location (query, header, path, cookie)",
-      "path": "document",
-      "severity": "error"
-    },
-    {
-      "message": "oas 3.0.3: missing required field 'paths.items.post.requestBody.content': RequestBody must have at least one media type",
-      "path": "document",
-      "severity": "error"
-    },
-    {
-      "message": "oas 3.0.3: duplicate operationId 'createItem' at 'paths./users.get': previously defined at 'paths.items.post' (operationIds must be unique across all operations)",
-      "path": "document",
+      "message": "Duplicate operationId 'createItem' at 'paths./users.get' and 'paths.items.post'",
+      "path": "duplicate:createItem",
       "severity": "error"
     },
     {
@@ -46,18 +16,48 @@
       "severity": "error"
     },
     {
-      "message": "RequestBody must have a content object with at least one media type",
-      "path": "paths.items.post.requestBody",
-      "severity": "error"
-    },
-    {
       "message": "Path parameters must have required: true",
       "path": "paths.items.get.parameters[0]",
       "severity": "error"
     },
     {
-      "message": "Duplicate operationId 'createItem' (first seen at paths.items.post)",
-      "path": "paths./users.get",
+      "message": "RequestBody must have a content object with at least one media type",
+      "path": "paths.items.post.requestBody",
+      "severity": "error"
+    },
+    {
+      "message": "duplicate operationId 'createItem' at 'paths./users.get' and 'paths.items.post'",
+      "path": "document",
+      "severity": "error"
+    },
+    {
+      "message": "oas 3.0.3: invalid parameter 'paths.items.get.parameters[0]': path parameters must have 'required: true' per spec",
+      "path": "document",
+      "severity": "error"
+    },
+    {
+      "message": "oas 3.0.3: invalid path pattern 'paths.items': path must begin with '/'",
+      "path": "document",
+      "severity": "error"
+    },
+    {
+      "message": "oas 3.0.3: missing required field 'info.version': Info object must have a version string per spec",
+      "path": "document",
+      "severity": "error"
+    },
+    {
+      "message": "oas 3.0.3: missing required field 'paths.items.get.parameters[1].in': Parameter must specify location (query, header, path, cookie)",
+      "path": "document",
+      "severity": "error"
+    },
+    {
+      "message": "oas 3.0.3: missing required field 'paths.items.get.responses': Operation must have a responses object",
+      "path": "document",
+      "severity": "error"
+    },
+    {
+      "message": "oas 3.0.3: missing required field 'paths.items.post.requestBody.content': RequestBody must have at least one media type",
+      "path": "document",
       "severity": "error"
     }
   ],
@@ -73,12 +73,12 @@
   "warnings": [
     {
       "message": "Operation should have a description or summary for better documentation",
-      "path": "paths.items.post",
+      "path": "paths./users.get",
       "severity": "warning"
     },
     {
       "message": "Operation should have a description or summary for better documentation",
-      "path": "paths./users.get",
+      "path": "paths.items.post",
       "severity": "warning"
     },
     {

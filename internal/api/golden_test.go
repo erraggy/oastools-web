@@ -10,6 +10,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/erraggy/oastools-web/internal/config"
@@ -102,6 +106,12 @@ func runGoldenTests(t *testing.T, tests []goldenTest) {
 			rec := httptest.NewRecorder()
 			handler.server.Handler.ServeHTTP(rec, req)
 
+			// Verify HTTP status code
+			if rec.Code != http.StatusOK {
+				t.Fatalf("unexpected status code: got %d, want %d\nresponse body: %s",
+					rec.Code, http.StatusOK, rec.Body.String())
+			}
+
 			// Normalize response for comparison
 			got := normalizeJSON(t, rec.Body.Bytes())
 
@@ -113,10 +123,13 @@ func runGoldenTests(t *testing.T, tests []goldenTest) {
 				return
 			}
 
-			want, err := os.ReadFile(tc.goldenFile)
+			wantRaw, err := os.ReadFile(tc.goldenFile)
 			if err != nil {
 				t.Fatalf("failed to read golden file (run with -update-golden to create): %v", err)
 			}
+
+			// Normalize the golden file too to ensure consistent comparison
+			want := normalizeJSON(t, wantRaw)
 
 			if !bytes.Equal(got, want) {
 				t.Errorf("response mismatch\ngot:\n%s\nwant:\n%s", got, want)
@@ -136,16 +149,20 @@ func buildMultipartRequest(t *testing.T, files map[string]string, values map[str
 		if err != nil {
 			t.Fatalf("failed to open %s: %v", path, err)
 		}
-		defer file.Close()
 
 		part, err := writer.CreateFormFile(field, filepath.Base(path))
 		if err != nil {
+			file.Close()
 			t.Fatalf("failed to create form file: %v", err)
 		}
 
 		if _, err := io.Copy(part, file); err != nil {
+			file.Close()
 			t.Fatalf("failed to copy file content: %v", err)
 		}
+
+		// Close file immediately after copying content to avoid leaking file descriptors
+		file.Close()
 	}
 
 	for field, value := range values {
@@ -170,6 +187,9 @@ func normalizeJSON(t *testing.T, data []byte) []byte {
 		return data
 	}
 
+	// Sort arrays that may have non-deterministic order
+	sortArraysRecursively(v)
+
 	// Re-marshal with consistent formatting
 	normalized, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -177,6 +197,80 @@ func normalizeJSON(t *testing.T, data []byte) []byte {
 	}
 
 	return append(normalized, '\n')
+}
+
+// sortArraysRecursively sorts arrays named "errors" or "warnings" by their JSON representation
+// to ensure deterministic ordering for golden file comparison.
+func sortArraysRecursively(v any) {
+	switch val := v.(type) {
+	case map[string]any:
+		for key, value := range val {
+			if key == "errors" || key == "warnings" {
+				if arr, ok := value.([]any); ok {
+					// Normalize error messages before sorting
+					for i, item := range arr {
+						if m, ok := item.(map[string]any); ok {
+							arr[i] = normalizeErrorItem(m)
+						}
+					}
+					slices.SortFunc(arr, compareJSONValues)
+				}
+			}
+			sortArraysRecursively(value)
+		}
+	case []any:
+		for _, item := range val {
+			sortArraysRecursively(item)
+		}
+	}
+}
+
+// normalizeErrorItem normalizes error messages that contain non-deterministic path references.
+// For example, duplicate operationId errors reference paths in iteration order which varies.
+func normalizeErrorItem(m map[string]any) map[string]any {
+	msg, ok := m["message"].(string)
+	if !ok {
+		return m
+	}
+
+	// Normalize "Duplicate operationId 'X' (first seen at Y)" pattern
+	// The path mentioned may vary based on map iteration order
+	// Also normalize the error's path field since it varies too
+	if strings.Contains(msg, "Duplicate operationId") {
+		re := regexp.MustCompile(`Duplicate operationId '([^']+)' \(first seen at ([^)]+)\)`)
+		if matches := re.FindStringSubmatch(msg); len(matches) == 3 {
+			opID := matches[1]
+			firstPath := matches[2]
+			// Get the current path and combine both into a deterministic form
+			if currentPath, ok := m["path"].(string); ok {
+				paths := []string{currentPath, firstPath}
+				sort.Strings(paths)
+				m["message"] = "Duplicate operationId '" + opID + "' at '" + paths[0] + "' and '" + paths[1] + "'"
+				m["path"] = "duplicate:" + opID // Normalize path to avoid iteration-dependent values
+			}
+		}
+	}
+
+	// Normalize "duplicate operationId 'X' at 'Y': previously defined at 'Z'" pattern
+	// Both Y and Z paths can vary based on iteration order
+	if strings.Contains(msg, "duplicate operationId") && strings.Contains(msg, "previously defined") {
+		re := regexp.MustCompile(`duplicate operationId '([^']+)' at '([^']+)': previously defined at '([^']+)'`)
+		if matches := re.FindStringSubmatch(msg); len(matches) == 4 {
+			// Sort the paths to ensure deterministic order
+			paths := []string{matches[2], matches[3]}
+			sort.Strings(paths)
+			m["message"] = "duplicate operationId '" + matches[1] + "' at '" + paths[0] + "' and '" + paths[1] + "'"
+		}
+	}
+
+	return m
+}
+
+// compareJSONValues compares two values by their JSON string representation.
+func compareJSONValues(a, b any) int {
+	aJSON, _ := json.Marshal(a)
+	bJSON, _ := json.Marshal(b)
+	return bytes.Compare(aJSON, bJSON)
 }
 
 func findRepoRoot(t *testing.T) string {
