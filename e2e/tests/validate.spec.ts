@@ -45,4 +45,15 @@ paths: {}`);
 
     await expect(page.locator('#result')).toContainText('Valid', { timeout: 10000 });
   });
+
+  test('validateStructure option is present and checked by default', async ({ page }) => {
+    await page.goto('/validate');
+
+    // Expand advanced options
+    await page.click('.advanced-options summary');
+
+    const checkbox = page.locator('input[name="validateStructure"]');
+    await expect(checkbox).toBeVisible();
+    await expect(checkbox).toBeChecked();
+  });
 });

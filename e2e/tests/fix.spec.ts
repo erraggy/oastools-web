@@ -28,4 +28,17 @@ test.describe('Fix Page', () => {
     // Dry run checkbox should be present
     await expect(page.locator('input[name="dryRun"]')).toBeVisible();
   });
+
+  test('new fix options are present', async ({ page }) => {
+    await page.goto('/fix');
+
+    // Main section should have duplicate operationIds option
+    await expect(page.locator('input[name="fixDuplicateOperationIds"]')).toBeVisible();
+
+    // Expand advanced options
+    await page.click('.advanced-options summary');
+
+    // New advanced options should be visible
+    await expect(page.locator('input[name="expandCSVEnums"]')).toBeVisible();
+  });
 });
