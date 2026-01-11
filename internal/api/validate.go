@@ -61,6 +61,7 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 	// Parse options
 	strict := r.FormValue("strict") == "on"
 	includeWarnings := r.FormValue("includeWarnings") != "off" // Default to true (checked by default)
+	validateStructure := r.FormValue("validateStructure") != "off"
 
 	// Parse using oastools
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(input.Content))
@@ -73,6 +74,7 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 	v := validator.New()
 	v.StrictMode = strict
 	v.IncludeWarnings = includeWarnings
+	v.ValidateStructure = validateStructure
 	validationResult, err := v.ValidateParsed(*parseResult)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "VALIDATION_FAILED",

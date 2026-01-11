@@ -1,0 +1,13 @@
+{
+  "errors": [],
+  "statistics": {
+    "errors": 0,
+    "operations": 3,
+    "paths": 2,
+    "schemas": 4,
+    "warnings": 0
+  },
+  "valid": true,
+  "version": "3.0.3",
+  "warnings": []
+}

@@ -68,6 +68,12 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	if r.FormValue("pruneEmptyPaths") == "on" {
 		enabledFixes = append(enabledFixes, fixer.FixTypePrunedEmptyPath)
 	}
+	if r.FormValue("fixDuplicateOperationIds") == "on" {
+		enabledFixes = append(enabledFixes, fixer.FixTypeDuplicateOperationId)
+	}
+	if r.FormValue("expandCSVEnums") == "on" {
+		enabledFixes = append(enabledFixes, fixer.FixTypeEnumCSVExpanded)
+	}
 
 	// If checkboxes selected, use only those fix types; otherwise nil enables all
 	if len(enabledFixes) > 0 {

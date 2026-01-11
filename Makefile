@@ -1,4 +1,4 @@
-.PHONY: build test lint lint-css lint-js lint-yaml lint-json run clean docker-build start stop restart status dev tidy help
+.PHONY: build test test-e2e lint lint-css lint-js lint-yaml lint-json run clean docker-build start stop restart status dev tidy help
 .PHONY: check fmt vet verify-templates verify-static logs
 
 VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo "dev")
@@ -27,6 +27,11 @@ build:
 test:
 	@echo "Running tests..."
 	go test -race -cover ./...
+
+## test-e2e: Run Playwright E2E tests
+test-e2e: build
+	@echo "Running E2E tests..."
+	npm run test:e2e
 
 ## lint: Run golangci-lint
 lint:
