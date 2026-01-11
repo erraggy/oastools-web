@@ -152,17 +152,17 @@ func buildMultipartRequest(t *testing.T, files map[string]string, values map[str
 
 		part, err := writer.CreateFormFile(field, filepath.Base(path))
 		if err != nil {
-			file.Close()
+			_ = file.Close()
 			t.Fatalf("failed to create form file: %v", err)
 		}
 
 		if _, err := io.Copy(part, file); err != nil {
-			file.Close()
+			_ = file.Close()
 			t.Fatalf("failed to copy file content: %v", err)
 		}
 
 		// Close file immediately after copying content to avoid leaking file descriptors
-		file.Close()
+		_ = file.Close()
 	}
 
 	for field, value := range values {
