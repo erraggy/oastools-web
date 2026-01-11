@@ -491,6 +491,14 @@ details.advanced-options[open] summary {
     width: auto;
 }
 
+.option-hint {
+    display: block;
+    margin-left: 1.75rem;
+    margin-top: 0.25rem;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+}
+
 /* Usage documentation section */
 details.usage-docs {
     margin-top: 2rem;
