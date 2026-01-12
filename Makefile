@@ -48,14 +48,14 @@ lint-css:
 lint-js:
 	@echo "Running JS linter..."
 	@npx eslint "static/js/**/*.js" --no-config-lookup \
-		--rule 'no-unused-vars: [warn, {varsIgnorePattern: "^(switchInputMode|copyToClipboard|downloadAsFile|addFileInput|removeFileInput)$$"}]' \
+		--rule 'no-unused-vars: [warn, {varsIgnorePattern: "^(switchInputMode|copyToClipboard|downloadAsFile|addFileInput|removeFileInput|loadExample|loadJoinExample)$$"}]' \
 		--rule 'no-undef: off' 2>/dev/null || true
 
 ## lint-yaml: Lint YAML configuration files
 lint-yaml:
 	@echo "Linting YAML files..."
-	@python3 -m yamllint --version >/dev/null 2>&1 || { echo "yamllint not installed: pip3 install yamllint"; exit 1; }
-	python3 -m yamllint .github/workflows/ cloudbuild.yaml .golangci.yml
+	@command -v yamllint >/dev/null 2>&1 || { echo "yamllint not installed: brew install yamllint"; exit 1; }
+	yamllint .github/workflows/ cloudbuild.yaml .golangci.yml
 
 ## lint-json: Validate JSON configuration files
 lint-json:

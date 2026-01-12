@@ -42,10 +42,13 @@ Establishes the pattern for all subsequent operation handlers.
 ```bash
 make build        # Build the server binary
 make test         # Run tests
-make lint         # Run linting
+make lint         # Run linting (Go + JS)
+make check        # Run all checks (lint + test) - REQUIRED before pushing
 make run          # Run the server locally
 docker build .    # Build container image
 ```
+
+**Important:** `make check` must pass with clean output before pushing any changes to origin.
 
 ## Architecture
 

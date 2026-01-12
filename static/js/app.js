@@ -99,7 +99,7 @@ function removeFileInput(button) {
 }
 
 // Load example spec into input section
-async function loadExample(select, fieldName) {
+async function loadExample(select) {
     const exampleName = select.value;
     if (!exampleName) return;
 

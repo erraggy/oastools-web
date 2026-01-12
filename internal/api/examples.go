@@ -52,7 +52,7 @@ func (h *Handler) handleListExamples(_ context.Context, _ *builder.Request) buil
 		return builder.Error(http.StatusInternalServerError, "failed to read examples")
 	}
 
-	var list []ExampleMetadata
+	list := make([]ExampleMetadata, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
