@@ -2,11 +2,19 @@ name: Claude PR Review
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened]
+  issue_comment:
+    types: [created]
 
 jobs:
   review:
     runs-on: ubuntu-latest
+    # Run if: PR opened OR /review comment on a PR
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/review'))
     permissions:
       contents: write  # Allow Claude to push commits to PRs
       pull-requests: write
@@ -19,13 +27,22 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Get PR number
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Review PR #${{ github.event.pull_request.number }}.
+            Review PR #${{ steps.pr.outputs.number }}.
 
             Focus on:
             - Code quality and Go best practices
@@ -59,7 +76,7 @@ jobs:
 
           if [ -n "$REVIEW" ]; then
             # Post the review as a PR comment
-            gh pr comment ${{ github.event.pull_request.number }} --body "## 🤖 Claude Code Review
+            gh pr comment ${{ steps.pr.outputs.number }} --body "## 🤖 Claude Code Review
 
           $REVIEW
 
