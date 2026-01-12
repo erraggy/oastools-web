@@ -60,6 +60,7 @@
         <p class="version-info">oastools-web {{.Version}} · oastools {{.OastoolsVersion}}</p>
     </footer>
     <script src="/static/js/app.js?v={{.Version}}"></script>
+    {{block "scripts" .}}{{end}}
 </body>
 </html>
 {{end}}
