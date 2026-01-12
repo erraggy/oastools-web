@@ -948,6 +948,1173 @@ func TestFormatTypeString(t *testing.T) {
 	}
 }
 
+// validOpenAPI30WithSecurity is an OpenAPI spec with security schemes for testing.
+const validOpenAPI30WithSecurity = `openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0.0"
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    Pet:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+paths:
+  /pets:
+    get:
+      summary: List all pets
+      operationId: listPets
+      responses:
+        "200":
+          description: A list of pets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+    post:
+      summary: Create a pet
+      operationId: createPet
+      security:
+        - apiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pet'
+      responses:
+        "201":
+          description: Pet created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /public:
+    get:
+      summary: Public endpoint
+      operationId: publicEndpoint
+      security: []
+      responses:
+        "200":
+          description: Public data
+`
+
+// validOpenAPI20WithSecurity is an OpenAPI 2.0 spec with security for testing.
+const validOpenAPI20WithSecurity = `swagger: "2.0"
+info:
+  title: Test API
+  version: "1.0.0"
+security:
+  - apiKey: []
+securityDefinitions:
+  apiKey:
+    type: apiKey
+    in: header
+    name: X-API-Key
+  oauth2:
+    type: oauth2
+    flow: accessCode
+    authorizationUrl: https://example.com/oauth/authorize
+    tokenUrl: https://example.com/oauth/token
+    scopes:
+      read: Read access
+      write: Write access
+paths:
+  /items:
+    get:
+      summary: List items
+      operationId: listItems
+      responses:
+        "200":
+          description: A list of items
+`
+
+func TestComputeHash(t *testing.T) {
+	tests := []struct {
+		name    string
+		content []byte
+		wantLen int
+	}{
+		{
+			name:    "basic content",
+			content: []byte("openapi: 3.0.0"),
+			wantLen: 16,
+		},
+		{
+			name:    "empty content",
+			content: []byte{},
+			wantLen: 16,
+		},
+		{
+			name:    "large content",
+			content: []byte(validOpenAPI30WithOperations),
+			wantLen: 16,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeHash(tt.content)
+			if len(got) != tt.wantLen {
+				t.Errorf("computeHash() length = %d, want %d", len(got), tt.wantLen)
+			}
+		})
+	}
+}
+
+func TestComputeHash_Deterministic(t *testing.T) {
+	content := []byte("openapi: 3.0.0")
+	hash1 := computeHash(content)
+	hash2 := computeHash(content)
+
+	if hash1 != hash2 {
+		t.Errorf("computeHash() not deterministic: %q != %q", hash1, hash2)
+	}
+}
+
+func TestComputeHash_DifferentContentDifferentHash(t *testing.T) {
+	content1 := []byte("openapi: 3.0.0")
+	content2 := []byte("openapi: 3.1.0")
+	hash1 := computeHash(content1)
+	hash2 := computeHash(content2)
+
+	if hash1 == hash2 {
+		t.Error("computeHash() produced same hash for different content")
+	}
+}
+
+func TestExtractSecuritySchemes(t *testing.T) {
+	tests := []struct {
+		name       string
+		specYAML   string
+		wantCount  int
+		wantScheme string
+		wantType   string
+	}{
+		{
+			name:       "OAS3 with security schemes",
+			specYAML:   validOpenAPI30WithSecurity,
+			wantCount:  2,
+			wantScheme: "bearerAuth",
+			wantType:   "http",
+		},
+		{
+			name:       "OAS2 with security definitions",
+			specYAML:   validOpenAPI20WithSecurity,
+			wantCount:  2,
+			wantScheme: "apiKey",
+			wantType:   "apiKey",
+		},
+		{
+			name:      "spec without security",
+			specYAML:  validOpenAPI30WithOperations,
+			wantCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(tt.specYAML)))
+			if err != nil {
+				t.Fatalf("failed to parse test spec: %v", err)
+			}
+
+			operations, err := walker.CollectOperations(parseResult)
+			if err != nil {
+				t.Fatalf("failed to collect operations: %v", err)
+			}
+
+			got := extractSecuritySchemes(parseResult, operations)
+
+			if len(got) != tt.wantCount {
+				t.Errorf("extractSecuritySchemes() returned %d schemes, want %d", len(got), tt.wantCount)
+			}
+
+			if tt.wantScheme != "" {
+				found := false
+				for _, scheme := range got {
+					if scheme.Name == tt.wantScheme && scheme.Type == tt.wantType {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("extractSecuritySchemes() did not find scheme %q with type %q", tt.wantScheme, tt.wantType)
+				}
+			}
+		})
+	}
+}
+
+func TestExtractSecuritySchemes_NilCases(t *testing.T) {
+	// Test nil result
+	if got := extractSecuritySchemes(nil, nil); got != nil {
+		t.Errorf("extractSecuritySchemes(nil, nil) = %v, want nil", got)
+	}
+}
+
+func TestExtractSecuritySchemes_UsageCount(t *testing.T) {
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(validOpenAPI30WithSecurity)))
+	if err != nil {
+		t.Fatalf("failed to parse test spec: %v", err)
+	}
+
+	operations, err := walker.CollectOperations(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect operations: %v", err)
+	}
+
+	schemes := extractSecuritySchemes(parseResult, operations)
+
+	// Find bearerAuth - should be used by listPets (inherits global security)
+	var bearerAuth *SecuritySchemeInfo
+	var apiKeyScheme *SecuritySchemeInfo
+	for i := range schemes {
+		if schemes[i].Name == "bearerAuth" {
+			bearerAuth = &schemes[i]
+		}
+		if schemes[i].Name == "apiKey" {
+			apiKeyScheme = &schemes[i]
+		}
+	}
+
+	if bearerAuth == nil {
+		t.Fatal("bearerAuth scheme not found")
+	}
+	// listPets inherits global bearerAuth security
+	if bearerAuth.UsageCount != 1 {
+		t.Errorf("bearerAuth.UsageCount = %d, want 1", bearerAuth.UsageCount)
+	}
+
+	if apiKeyScheme == nil {
+		t.Fatal("apiKey scheme not found")
+	}
+	// createPet explicitly uses apiKey
+	if apiKeyScheme.UsageCount != 1 {
+		t.Errorf("apiKey.UsageCount = %d, want 1", apiKeyScheme.UsageCount)
+	}
+}
+
+func TestComputeExploreStats(t *testing.T) {
+	tests := []struct {
+		name             string
+		specYAML         string
+		wantPathCount    int
+		wantOpCount      int
+		wantSecuredCount int
+		wantUnsecured    int
+	}{
+		{
+			name:             "spec with security",
+			specYAML:         validOpenAPI30WithSecurity,
+			wantPathCount:    2,
+			wantOpCount:      3,
+			wantSecuredCount: 2, // listPets (inherits global) + createPet (explicit apiKey)
+			wantUnsecured:    1, // publicEndpoint (explicit empty [])
+		},
+		{
+			name:             "spec without security",
+			specYAML:         validOpenAPI30WithOperations,
+			wantPathCount:    2,
+			wantOpCount:      4,
+			wantSecuredCount: 0,
+			wantUnsecured:    4, // All unsecured
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(tt.specYAML)))
+			if err != nil {
+				t.Fatalf("failed to parse test spec: %v", err)
+			}
+
+			operations, err := walker.CollectOperations(parseResult)
+			if err != nil {
+				t.Fatalf("failed to collect operations: %v", err)
+			}
+
+			schemas, err := walker.CollectSchemas(parseResult)
+			if err != nil {
+				t.Fatalf("failed to collect schemas: %v", err)
+			}
+
+			stats := computeExploreStats(parseResult, operations, schemas)
+
+			if stats.PathCount != tt.wantPathCount {
+				t.Errorf("PathCount = %d, want %d", stats.PathCount, tt.wantPathCount)
+			}
+			if stats.OperationCount != tt.wantOpCount {
+				t.Errorf("OperationCount = %d, want %d", stats.OperationCount, tt.wantOpCount)
+			}
+			if stats.SecuredCount != tt.wantSecuredCount {
+				t.Errorf("SecuredCount = %d, want %d", stats.SecuredCount, tt.wantSecuredCount)
+			}
+			if stats.UnsecuredCount != tt.wantUnsecured {
+				t.Errorf("UnsecuredCount = %d, want %d", stats.UnsecuredCount, tt.wantUnsecured)
+			}
+		})
+	}
+}
+
+func TestComputeExploreStats_NilCases(t *testing.T) {
+	stats := computeExploreStats(nil, nil, nil)
+
+	if stats.PathCount != 0 {
+		t.Errorf("PathCount = %d, want 0", stats.PathCount)
+	}
+	if stats.OperationCount != 0 {
+		t.Errorf("OperationCount = %d, want 0", stats.OperationCount)
+	}
+	if stats.MethodCounts == nil {
+		t.Error("MethodCounts should be initialized even with nil inputs")
+	}
+}
+
+func TestComputeExploreStats_MethodCounts(t *testing.T) {
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(validOpenAPI30WithOperations)))
+	if err != nil {
+		t.Fatalf("failed to parse test spec: %v", err)
+	}
+
+	operations, err := walker.CollectOperations(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect operations: %v", err)
+	}
+
+	schemas, err := walker.CollectSchemas(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect schemas: %v", err)
+	}
+
+	stats := computeExploreStats(parseResult, operations, schemas)
+
+	// The spec has: GET /pets, POST /pets, GET /pets/{petId}, DELETE /pets/{petId}
+	if stats.MethodCounts["GET"] != 2 {
+		t.Errorf("GET count = %d, want 2", stats.MethodCounts["GET"])
+	}
+	if stats.MethodCounts["POST"] != 1 {
+		t.Errorf("POST count = %d, want 1", stats.MethodCounts["POST"])
+	}
+	if stats.MethodCounts["DELETE"] != 1 {
+		t.Errorf("DELETE count = %d, want 1", stats.MethodCounts["DELETE"])
+	}
+}
+
+// setupTestAnalysisWithSecurity creates and caches a test analysis with security schemes.
+func setupTestAnalysisWithSecurity(t *testing.T, hash string) {
+	t.Helper()
+
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(validOpenAPI30WithSecurity)))
+	if err != nil {
+		t.Fatalf("failed to parse test spec: %v", err)
+	}
+
+	operations, err := walker.CollectOperations(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect operations: %v", err)
+	}
+
+	schemas, err := walker.CollectSchemas(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect schemas: %v", err)
+	}
+
+	security := extractSecuritySchemes(parseResult, operations)
+	stats := computeExploreStats(parseResult, operations, schemas)
+
+	analysis := &ExploreAnalysis{
+		Hash:        hash,
+		Version:     "3.0.0",
+		Filename:    "test.yaml",
+		ParseResult: parseResult,
+		Operations:  operations,
+		Schemas:     schemas,
+		Security:    security,
+		Stats:       stats,
+	}
+
+	exploreCache.Set(hash, analysis)
+}
+
+func TestFindSchemaUsages(t *testing.T) {
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(validOpenAPI30WithSecurity)))
+	if err != nil {
+		t.Fatalf("failed to parse test spec: %v", err)
+	}
+
+	operations, err := walker.CollectOperations(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect operations: %v", err)
+	}
+
+	schemas, err := walker.CollectSchemas(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect schemas: %v", err)
+	}
+
+	analysis := &ExploreAnalysis{
+		ParseResult: parseResult,
+		Operations:  operations,
+		Schemas:     schemas,
+	}
+
+	tests := []struct {
+		name       string
+		schemaName string
+		wantCount  int
+		wantUsage  *SchemaUsage
+	}{
+		{
+			name:       "Pet schema used in multiple places",
+			schemaName: "Pet",
+			wantCount:  3, // GET response, POST request body, POST response
+			wantUsage: &SchemaUsage{
+				Method:       "get",
+				PathTemplate: "/pets",
+				Context:      "response 200",
+			},
+		},
+		{
+			name:       "Error schema used in one place",
+			schemaName: "Error",
+			wantCount:  1, // POST 400 response
+			wantUsage: &SchemaUsage{
+				Method:       "post",
+				PathTemplate: "/pets",
+				Context:      "response 400",
+			},
+		},
+		{
+			name:       "nonexistent schema",
+			schemaName: "NonExistent",
+			wantCount:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			usages := findSchemaUsages(analysis, tt.schemaName)
+
+			if len(usages) != tt.wantCount {
+				t.Errorf("findSchemaUsages(%q) returned %d usages, want %d", tt.schemaName, len(usages), tt.wantCount)
+			}
+
+			if tt.wantUsage != nil && tt.wantCount > 0 {
+				found := false
+				for _, u := range usages {
+					if u.Method == tt.wantUsage.Method &&
+						u.PathTemplate == tt.wantUsage.PathTemplate &&
+						u.Context == tt.wantUsage.Context {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("findSchemaUsages(%q) did not find expected usage %+v", tt.schemaName, tt.wantUsage)
+				}
+			}
+		})
+	}
+}
+
+func TestFindSecurityUsages(t *testing.T) {
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(validOpenAPI30WithSecurity)))
+	if err != nil {
+		t.Fatalf("failed to parse test spec: %v", err)
+	}
+
+	operations, err := walker.CollectOperations(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect operations: %v", err)
+	}
+
+	analysis := &ExploreAnalysis{
+		ParseResult: parseResult,
+		Operations:  operations,
+	}
+
+	tests := []struct {
+		name       string
+		schemeName string
+		wantCount  int
+		wantPath   string
+	}{
+		{
+			name:       "bearerAuth used via global security",
+			schemeName: "bearerAuth",
+			wantCount:  1, // listPets inherits global
+			wantPath:   "/pets",
+		},
+		{
+			name:       "apiKey used explicitly",
+			schemeName: "apiKey",
+			wantCount:  1, // createPet
+			wantPath:   "/pets",
+		},
+		{
+			name:       "nonexistent scheme",
+			schemeName: "nonexistent",
+			wantCount:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			usages := findSecurityUsages(analysis, tt.schemeName)
+
+			if len(usages) != tt.wantCount {
+				t.Errorf("findSecurityUsages(%q) returned %d usages, want %d", tt.schemeName, len(usages), tt.wantCount)
+			}
+
+			if tt.wantPath != "" && len(usages) > 0 {
+				found := false
+				for _, u := range usages {
+					if u.PathTemplate == tt.wantPath {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("findSecurityUsages(%q) did not find expected path %q", tt.schemeName, tt.wantPath)
+				}
+			}
+		})
+	}
+}
+
+func TestFindSecurityUsages_NilCases(t *testing.T) {
+	// Test nil analysis
+	if got := findSecurityUsages(nil, "test"); len(got) != 0 {
+		t.Errorf("findSecurityUsages(nil, ...) = %v, want empty slice", got)
+	}
+
+	// Test nil operations
+	analysis := &ExploreAnalysis{Operations: nil}
+	if got := findSecurityUsages(analysis, "test"); len(got) != 0 {
+		t.Errorf("findSecurityUsages(nil operations) = %v, want empty slice", got)
+	}
+}
+
+// securityTestHandler creates a handler for security tests with appropriate templates.
+func securityTestHandler(t *testing.T) *Handler {
+	t.Helper()
+
+	partials, err := template.New("partials").Parse(`
+{{define "error"}}Error: {{.Message}}{{end}}
+{{define "explore_security"}}
+<div class="security-container">
+  <div class="security-header">Security Schemes: {{len .Analysis.Security}}</div>
+  {{range .Analysis.Security}}
+  <div class="security-row">{{.Name}}: {{.Type}} ({{.UsageCount}} uses)</div>
+  {{end}}
+</div>
+{{end}}
+{{define "explore_schema_detail"}}
+<div class="schema-detail">
+  <h3>{{.Name}}</h3>
+  <div class="usages">Used in: {{len .UsedIn}} places</div>
+</div>
+{{end}}
+{{define "explore_security_detail"}}
+<div class="security-detail">
+  <h3>{{.Scheme.Name}}</h3>
+  <div class="type">Type: {{.Scheme.Type}}</div>
+  <div class="usages">Used by: {{len .UsedBy}} operations</div>
+</div>
+{{end}}
+`)
+	if err != nil {
+		t.Fatalf("failed to create test partials: %v", err)
+	}
+
+	return &Handler{
+		cfg: &config.Config{
+			MaxFileSize: 2 << 20,
+		},
+		partials:        partials,
+		version:         "test-version",
+		oastoolsVersion: "test-oastools-version",
+	}
+}
+
+func TestHandler_handleExploreSecurity(t *testing.T) {
+	tests := []struct {
+		name           string
+		queryParams    string
+		setupHash      string
+		wantStatus     int
+		wantContains   string
+		wantCacheEvent bool
+	}{
+		{
+			name:         "missing hash parameter",
+			queryParams:  "",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "Missing hash parameter",
+		},
+		{
+			name:           "cache miss returns 410 Gone",
+			queryParams:    "h=nonexistent",
+			wantStatus:     http.StatusGone,
+			wantCacheEvent: true,
+		},
+		{
+			name:         "successful security render",
+			queryParams:  "h=securityhash1",
+			setupHash:    "securityhash1",
+			wantStatus:   http.StatusOK,
+			wantContains: "security-container",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := securityTestHandler(t)
+
+			if tt.setupHash != "" {
+				setupTestAnalysisWithSecurity(t, tt.setupHash)
+				t.Cleanup(func() {
+					exploreCache.Delete(tt.setupHash)
+				})
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/explore/security?"+tt.queryParams, nil)
+			resp := h.handleExploreSecurity(context.Background(), &builder.Request{HTTPRequest: req})
+
+			if resp.StatusCode() != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode(), tt.wantStatus)
+			}
+
+			if tt.wantCacheEvent {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				if rec.Header().Get("HX-Trigger") != "cacheExpired" {
+					t.Errorf("expected HX-Trigger=cacheExpired header")
+				}
+				return
+			}
+
+			if tt.wantContains != "" {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				body := rec.Body.String()
+				if !strings.Contains(body, tt.wantContains) {
+					t.Errorf("body = %q, want contains %q", body, tt.wantContains)
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_handleExploreSchemaDetail(t *testing.T) {
+	tests := []struct {
+		name           string
+		queryParams    string
+		setupHash      string
+		wantStatus     int
+		wantContains   string
+		wantCacheEvent bool
+	}{
+		{
+			name:         "missing hash parameter",
+			queryParams:  "",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "Missing hash parameter",
+		},
+		{
+			name:         "missing name parameter",
+			queryParams:  "h=schemadetail1",
+			setupHash:    "schemadetail1",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "Missing name parameter",
+		},
+		{
+			name:           "cache miss returns 410 Gone",
+			queryParams:    "h=nonexistent&name=Pet",
+			wantStatus:     http.StatusGone,
+			wantCacheEvent: true,
+		},
+		{
+			name:         "schema not found",
+			queryParams:  "h=schemadetail2&name=NonExistent",
+			setupHash:    "schemadetail2",
+			wantStatus:   http.StatusNotFound,
+			wantContains: "Schema not found",
+		},
+		{
+			name:         "successful schema detail",
+			queryParams:  "h=schemadetail3&name=Pet",
+			setupHash:    "schemadetail3",
+			wantStatus:   http.StatusOK,
+			wantContains: "schema-detail",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := securityTestHandler(t)
+
+			if tt.setupHash != "" {
+				setupTestAnalysisWithSecurity(t, tt.setupHash)
+				t.Cleanup(func() {
+					exploreCache.Delete(tt.setupHash)
+				})
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/explore/schema?"+tt.queryParams, nil)
+			resp := h.handleExploreSchemaDetail(context.Background(), &builder.Request{HTTPRequest: req})
+
+			if resp.StatusCode() != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode(), tt.wantStatus)
+			}
+
+			if tt.wantCacheEvent {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				if rec.Header().Get("HX-Trigger") != "cacheExpired" {
+					t.Errorf("expected HX-Trigger=cacheExpired header")
+				}
+				return
+			}
+
+			if tt.wantContains != "" {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				body := rec.Body.String()
+				if !strings.Contains(body, tt.wantContains) {
+					t.Errorf("body = %q, want contains %q", body, tt.wantContains)
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_handleExploreSecurityDetail(t *testing.T) {
+	tests := []struct {
+		name           string
+		queryParams    string
+		setupHash      string
+		wantStatus     int
+		wantContains   string
+		wantCacheEvent bool
+	}{
+		{
+			name:         "missing hash parameter",
+			queryParams:  "",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "Missing hash parameter",
+		},
+		{
+			name:         "missing name parameter",
+			queryParams:  "h=secdetail1",
+			setupHash:    "secdetail1",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "Missing name parameter",
+		},
+		{
+			name:           "cache miss returns 410 Gone",
+			queryParams:    "h=nonexistent&name=bearerAuth",
+			wantStatus:     http.StatusGone,
+			wantCacheEvent: true,
+		},
+		{
+			name:         "security scheme not found",
+			queryParams:  "h=secdetail2&name=NonExistent",
+			setupHash:    "secdetail2",
+			wantStatus:   http.StatusNotFound,
+			wantContains: "Security scheme not found",
+		},
+		{
+			name:         "successful security detail",
+			queryParams:  "h=secdetail3&name=bearerAuth",
+			setupHash:    "secdetail3",
+			wantStatus:   http.StatusOK,
+			wantContains: "security-detail",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := securityTestHandler(t)
+
+			if tt.setupHash != "" {
+				setupTestAnalysisWithSecurity(t, tt.setupHash)
+				t.Cleanup(func() {
+					exploreCache.Delete(tt.setupHash)
+				})
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/explore/security-detail?"+tt.queryParams, nil)
+			resp := h.handleExploreSecurityDetail(context.Background(), &builder.Request{HTTPRequest: req})
+
+			if resp.StatusCode() != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode(), tt.wantStatus)
+			}
+
+			if tt.wantCacheEvent {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				if rec.Header().Get("HX-Trigger") != "cacheExpired" {
+					t.Errorf("expected HX-Trigger=cacheExpired header")
+				}
+				return
+			}
+
+			if tt.wantContains != "" {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				body := rec.Body.String()
+				if !strings.Contains(body, tt.wantContains) {
+					t.Errorf("body = %q, want contains %q", body, tt.wantContains)
+				}
+			}
+		})
+	}
+}
+
+// uploadTestHandler creates a handler for upload tests with appropriate templates.
+func uploadTestHandler(t *testing.T) *Handler {
+	t.Helper()
+
+	partials, err := template.New("partials").Parse(`
+{{define "error"}}Error: {{.Message}}{{end}}
+{{define "explore_results"}}
+<div class="explore-results" data-hash="{{.Analysis.Hash}}">
+  <h2>{{.Analysis.Filename}}</h2>
+  <div class="version">Version: {{.Analysis.Version}}</div>
+  <div class="stats">
+    <span>Paths: {{.Analysis.Stats.PathCount}}</span>
+    <span>Operations: {{.Analysis.Stats.OperationCount}}</span>
+  </div>
+</div>
+{{end}}
+`)
+	if err != nil {
+		t.Fatalf("failed to create test partials: %v", err)
+	}
+
+	return &Handler{
+		cfg: &config.Config{
+			MaxFileSize: 2 << 20,
+		},
+		partials:        partials,
+		version:         "test-version",
+		oastoolsVersion: "test-oastools-version",
+	}
+}
+
+func TestHandler_handleExploreUpload(t *testing.T) {
+	tests := []struct {
+		name         string
+		specContent  string
+		inputMode    string
+		wantStatus   int
+		wantContains string
+		isHTMX       bool
+	}{
+		{
+			name:         "valid OAS3 spec via paste (HTML)",
+			specContent:  validOpenAPI30WithOperations,
+			inputMode:    "paste",
+			wantStatus:   http.StatusOK,
+			wantContains: "explore-results",
+			isHTMX:       true,
+		},
+		{
+			name:         "valid OAS3 spec via paste (JSON)",
+			specContent:  validOpenAPI30WithOperations,
+			inputMode:    "paste",
+			wantStatus:   http.StatusOK,
+			wantContains: `"hash"`,
+			isHTMX:       false,
+		},
+		{
+			name:         "invalid spec",
+			specContent:  "not: valid: yaml: content",
+			inputMode:    "paste",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "PARSE_FAILED",
+			isHTMX:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := uploadTestHandler(t)
+
+			// Create form request
+			form := "input_mode=" + tt.inputMode + "&spec_content=" + tt.specContent
+			req := httptest.NewRequest(http.MethodPost, "/api/explore", strings.NewReader(form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			if tt.isHTMX {
+				req.Header.Set("HX-Request", "true")
+			}
+
+			resp := h.handleExploreUpload(context.Background(), &builder.Request{HTTPRequest: req})
+
+			if resp.StatusCode() != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode(), tt.wantStatus)
+			}
+
+			rec := httptest.NewRecorder()
+			if err := resp.WriteTo(rec); err != nil {
+				t.Fatalf("WriteTo failed: %v", err)
+			}
+			body := rec.Body.String()
+
+			if !strings.Contains(body, tt.wantContains) {
+				t.Errorf("body = %q, want contains %q", body, tt.wantContains)
+			}
+		})
+	}
+}
+
+func TestHandler_handleExploreUpload_CacheHit(t *testing.T) {
+	h := uploadTestHandler(t)
+
+	// Upload spec first time
+	form := "input_mode=paste&spec_content=" + validOpenAPI30WithOperations
+	req := httptest.NewRequest(http.MethodPost, "/api/explore", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp1 := h.handleExploreUpload(context.Background(), &builder.Request{HTTPRequest: req})
+	if resp1.StatusCode() != http.StatusOK {
+		t.Fatalf("first upload failed with status %d", resp1.StatusCode())
+	}
+
+	// Upload same spec again - should hit cache
+	req2 := httptest.NewRequest(http.MethodPost, "/api/explore", strings.NewReader(form))
+	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp2 := h.handleExploreUpload(context.Background(), &builder.Request{HTTPRequest: req2})
+	if resp2.StatusCode() != http.StatusOK {
+		t.Errorf("cache hit upload failed with status %d", resp2.StatusCode())
+	}
+}
+
+func TestRenderExploreResult(t *testing.T) {
+	h := uploadTestHandler(t)
+
+	analysis := &ExploreAnalysis{
+		Hash:     "testhash",
+		Version:  "3.0.0",
+		Filename: "test.yaml",
+		Stats: ExploreStats{
+			PathCount:      5,
+			OperationCount: 10,
+		},
+	}
+
+	tests := []struct {
+		name         string
+		isHTMX       bool
+		wantContains string
+	}{
+		{
+			name:         "HTML response",
+			isHTMX:       true,
+			wantContains: "explore-results",
+		},
+		{
+			name:         "JSON response",
+			isHTMX:       false,
+			wantContains: `"hash":"testhash"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/explore", nil)
+			if tt.isHTMX {
+				req.Header.Set("HX-Request", "true")
+			}
+
+			resp := h.renderExploreResult(req, analysis)
+
+			rec := httptest.NewRecorder()
+			if err := resp.WriteTo(rec); err != nil {
+				t.Fatalf("WriteTo failed: %v", err)
+			}
+			body := rec.Body.String()
+
+			if !strings.Contains(body, tt.wantContains) {
+				t.Errorf("body = %q, want contains %q", body, tt.wantContains)
+			}
+		})
+	}
+}
+
+func TestExtractOAuthFlows(t *testing.T) {
+	tests := []struct {
+		name      string
+		flows     *parser.OAuthFlows
+		wantCount int
+		wantTypes []string
+	}{
+		{
+			name:      "nil flows",
+			flows:     nil,
+			wantCount: 0,
+		},
+		{
+			name: "implicit flow",
+			flows: &parser.OAuthFlows{
+				Implicit: &parser.OAuthFlow{
+					AuthorizationURL: "https://example.com/auth",
+					Scopes:           map[string]string{"read": "Read access"},
+				},
+			},
+			wantCount: 1,
+			wantTypes: []string{"implicit"},
+		},
+		{
+			name: "all flows",
+			flows: &parser.OAuthFlows{
+				Implicit: &parser.OAuthFlow{
+					AuthorizationURL: "https://example.com/auth",
+				},
+				Password: &parser.OAuthFlow{
+					TokenURL: "https://example.com/token",
+				},
+				ClientCredentials: &parser.OAuthFlow{
+					TokenURL: "https://example.com/token",
+				},
+				AuthorizationCode: &parser.OAuthFlow{
+					AuthorizationURL: "https://example.com/auth",
+					TokenURL:         "https://example.com/token",
+				},
+			},
+			wantCount: 4,
+			wantTypes: []string{"implicit", "password", "clientCredentials", "authorizationCode"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractOAuthFlows(tt.flows)
+
+			if len(got) != tt.wantCount {
+				t.Errorf("extractOAuthFlows() returned %d flows, want %d", len(got), tt.wantCount)
+			}
+
+			for _, wantType := range tt.wantTypes {
+				found := false
+				for _, flow := range got {
+					if flow.Type == wantType {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("extractOAuthFlows() did not return flow type %q", wantType)
+				}
+			}
+		})
+	}
+}
+
+func TestCountSecurityUsage(t *testing.T) {
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(validOpenAPI30WithSecurity)))
+	if err != nil {
+		t.Fatalf("failed to parse test spec: %v", err)
+	}
+
+	operations, err := walker.CollectOperations(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect operations: %v", err)
+	}
+
+	counts := countSecurityUsage(parseResult, operations)
+
+	// bearerAuth is used via global security by listPets
+	if counts["bearerAuth"] != 1 {
+		t.Errorf("bearerAuth count = %d, want 1", counts["bearerAuth"])
+	}
+
+	// apiKey is used explicitly by createPet
+	if counts["apiKey"] != 1 {
+		t.Errorf("apiKey count = %d, want 1", counts["apiKey"])
+	}
+}
+
+func TestCountSecurityUsage_NilOperations(t *testing.T) {
+	counts := countSecurityUsage(nil, nil)
+	if len(counts) != 0 {
+		t.Errorf("countSecurityUsage(nil, nil) = %v, want empty map", counts)
+	}
+}
+
+func TestGetVersionString(t *testing.T) {
+	tests := []struct {
+		name   string
+		result *parser.ParseResult
+		want   string
+	}{
+		{
+			name:   "nil result",
+			result: nil,
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getVersionString(tt.result)
+			if got != tt.want {
+				t.Errorf("getVersionString() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetVersionString_WithParsedSpec(t *testing.T) {
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(validOpenAPI30WithOperations)))
+	if err != nil {
+		t.Fatalf("failed to parse test spec: %v", err)
+	}
+
+	got := getVersionString(parseResult)
+	if got != "3.0.0" {
+		t.Errorf("getVersionString() = %q, want %q", got, "3.0.0")
+	}
+}
+
 // Ensure cache is cleaned up between tests
 func init() {
 	// Use a short TTL for testing
