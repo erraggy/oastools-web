@@ -23,5 +23,9 @@ export default defineConfig({
     url: 'http://localhost:8080/health',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
+    env: {
+      // Increase rate limit for E2E tests to avoid 429 errors
+      RATE_LIMIT_RPM: '600',
+    },
   },
 });
