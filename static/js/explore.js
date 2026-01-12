@@ -6,7 +6,31 @@
 
     const STORAGE_KEY = 'oastools_explore_spec';
 
-    // Store spec content before form submission
+    // Store file content when user selects a file (before form submission)
+    // This ensures content is available for 410 recovery even if server restarts
+    document.addEventListener('change', function(evt) {
+        const target = evt.target;
+
+        if (target.name === 'spec' && target.files && target.files[0]) {
+            // File input changed - read and store the content
+            const file = target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    content: e.target.result,
+                    filename: file.name,
+                    timestamp: Date.now()
+                }));
+            };
+            reader.readAsText(file);
+        } else if (target.name === 'spec_content' || target.name === 'spec_url') {
+            // Clear stored spec when other inputs change
+            // (actual content will be stored on form submit)
+            sessionStorage.removeItem(STORAGE_KEY);
+        }
+    });
+
+    // Store paste/URL content on form submission (these are synchronous)
     document.addEventListener('htmx:configRequest', function(evt) {
         // Only intercept POST to /api/explore
         if (evt.detail.path !== '/api/explore' || evt.detail.verb !== 'post') {
@@ -21,32 +45,12 @@
         const inputMode = form.querySelector('input[name="input_mode"]');
         const mode = inputMode ? inputMode.value : 'file';
 
-        let specContent = null;
-        let filename = 'spec.yaml';
-
-        if (mode === 'file') {
-            const fileInput = form.querySelector('input[name="spec"]');
-            if (fileInput && fileInput.files && fileInput.files[0]) {
-                const file = fileInput.files[0];
-                filename = file.name;
-                // Read file synchronously is not possible, so we need to
-                // use FileReader and store before the request completes
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-                        content: e.target.result,
-                        filename: filename,
-                        timestamp: Date.now()
-                    }));
-                };
-                reader.readAsText(file);
-            }
-        } else if (mode === 'paste') {
+        // File content is already stored on input change, just handle paste/URL
+        if (mode === 'paste') {
             const textarea = form.querySelector('textarea[name="spec_content"]');
             if (textarea && textarea.value) {
-                specContent = textarea.value;
                 sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    content: specContent,
+                    content: textarea.value,
                     filename: 'pasted-spec.yaml',
                     timestamp: Date.now()
                 }));
@@ -93,16 +97,6 @@
 
         // Resubmit the spec to /api/explore
         resubmitSpec(parsed, evt.detail.target, evt.detail.requestConfig);
-    });
-
-    // Clear stored spec when input changes
-    document.addEventListener('change', function(evt) {
-        const target = evt.target;
-        if (target.name === 'spec' ||
-            target.name === 'spec_content' ||
-            target.name === 'spec_url') {
-            sessionStorage.removeItem(STORAGE_KEY);
-        }
     });
 
     // Mode toggle handling (upload vs paste vs url)
