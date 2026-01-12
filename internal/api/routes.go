@@ -415,4 +415,33 @@ func (h *Handler) registerOperations(srv *builder.ServerBuilder) {
 		),
 		builder.WithHandler(h.handleExploreSummaryDetails),
 	)
+
+	// GET /api/examples - list available examples
+	srv.AddOperation(http.MethodGet, "/api/examples",
+		builder.WithOperationID("listExamples"),
+		builder.WithSummary("List available example specifications"),
+		builder.WithTags("examples"),
+		builder.WithResponse(http.StatusOK, []ExampleMetadata{},
+			builder.WithResponseDescription("List of available examples"),
+		),
+		builder.WithHandler(h.handleListExamples),
+	)
+
+	// GET /api/examples/{name} - get example spec content
+	srv.AddOperation(http.MethodGet, "/api/examples/{name}",
+		builder.WithOperationID("getExample"),
+		builder.WithSummary("Get example specification content"),
+		builder.WithTags("examples"),
+		builder.WithPathParam("name", "string",
+			builder.WithParamDescription("Example name (without .yaml extension)"),
+			builder.WithParamRequired(true),
+		),
+		builder.WithResponse(http.StatusOK, nil,
+			builder.WithResponseDescription("Example specification in YAML format"),
+		),
+		builder.WithResponse(http.StatusNotFound, ErrorResponse{},
+			builder.WithResponseDescription("Example not found"),
+		),
+		builder.WithHandler(h.handleGetExample),
+	)
 }
