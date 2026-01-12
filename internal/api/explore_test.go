@@ -80,6 +80,16 @@ func exploreTestHandler(t *testing.T) *Handler {
 {{end}}
 </div>
 {{end}}
+{{define "explore_operation_detail"}}
+<div class="detail-card" id="op-{{.OperationID}}">
+  <span class="method-badge">{{.Method}}</span>
+  <span class="detail-path">{{.PathTemplate}}</span>
+  {{if .Operation.Summary}}<p class="detail-summary">{{.Operation.Summary}}</p>{{end}}
+  {{if .Operation.Description}}<p class="detail-description">{{.Operation.Description}}</p>{{end}}
+  {{if .Operation.Parameters}}<div class="params">{{len .Operation.Parameters}} params</div>{{end}}
+  {{if .Operation.Responses}}<div class="responses">has responses</div>{{end}}
+</div>
+{{end}}
 `)
 	if err != nil {
 		t.Fatalf("failed to create test partials: %v", err)
@@ -195,6 +205,117 @@ func TestHandler_handleExploreOperations(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodGet, "/api/explore/operations?"+tt.queryParams, nil)
 			resp := h.handleExploreOperations(context.Background(), &builder.Request{HTTPRequest: req})
+
+			if resp.StatusCode() != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode(), tt.wantStatus)
+			}
+
+			// Check for cache expired response
+			if tt.wantCacheEvent {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				if rec.Header().Get("HX-Trigger") != "cacheExpired" {
+					t.Errorf("expected HX-Trigger=cacheExpired header")
+				}
+				return
+			}
+
+			// Check response body contains expected content
+			if tt.wantContains != "" {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				body := rec.Body.String()
+				if !strings.Contains(body, tt.wantContains) {
+					t.Errorf("body = %q, want contains %q", body, tt.wantContains)
+				}
+			}
+		})
+	}
+}
+
+func TestHandler_handleExploreOperationDetail(t *testing.T) {
+	tests := []struct {
+		name           string
+		queryParams    string
+		setupHash      string
+		wantStatus     int
+		wantContains   string
+		wantCacheEvent bool
+	}{
+		{
+			name:         "missing hash parameter",
+			queryParams:  "",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "Missing hash parameter",
+		},
+		{
+			name:           "cache miss returns 410 Gone",
+			queryParams:    "h=nonexistent&path=/pets&method=get",
+			wantStatus:     http.StatusGone,
+			wantCacheEvent: true,
+		},
+		{
+			name:         "missing path parameter",
+			queryParams:  "h=opdetail1&method=get",
+			setupHash:    "opdetail1",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "Missing path or method",
+		},
+		{
+			name:         "missing method parameter",
+			queryParams:  "h=opdetail2&path=/pets",
+			setupHash:    "opdetail2",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: "Missing path or method",
+		},
+		{
+			name:         "operation not found",
+			queryParams:  "h=opdetail3&path=/nonexistent&method=get",
+			setupHash:    "opdetail3",
+			wantStatus:   http.StatusNotFound,
+			wantContains: "Operation not found",
+		},
+		{
+			name:         "successful operation detail",
+			queryParams:  "h=opdetail4&path=/pets&method=get",
+			setupHash:    "opdetail4",
+			wantStatus:   http.StatusOK,
+			wantContains: "List all pets",
+		},
+		{
+			name:         "operation with path parameter",
+			queryParams:  "h=opdetail5&path=/pets/{petId}&method=get",
+			setupHash:    "opdetail5",
+			wantStatus:   http.StatusOK,
+			wantContains: "Get a pet by ID",
+		},
+		{
+			name:         "uses operationId when available",
+			queryParams:  "h=opdetail6&path=/pets&method=post",
+			setupHash:    "opdetail6",
+			wantStatus:   http.StatusOK,
+			wantContains: "op-createPet",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := exploreTestHandler(t)
+
+			// Setup cache if needed
+			if tt.setupHash != "" {
+				setupTestAnalysis(t, tt.setupHash)
+				t.Cleanup(func() {
+					exploreCache.Delete(tt.setupHash)
+				})
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/explore/operation?"+tt.queryParams, nil)
+			resp := h.handleExploreOperationDetail(context.Background(), &builder.Request{HTTPRequest: req})
 
 			if resp.StatusCode() != tt.wantStatus {
 				t.Errorf("status = %d, want %d", resp.StatusCode(), tt.wantStatus)

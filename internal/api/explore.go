@@ -422,3 +422,56 @@ func (h *Handler) handleExploreSchemas(_ context.Context, _ *builder.Request) bu
 func (h *Handler) handleExploreSecurity(_ context.Context, _ *builder.Request) builder.Response {
 	return builder.Error(http.StatusNotImplemented, "Not implemented")
 }
+
+// handleExploreOperationDetail renders the operation detail partial.
+func (h *Handler) handleExploreOperationDetail(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+	hash := r.URL.Query().Get("h")
+	if hash == "" {
+		return builder.Error(http.StatusBadRequest, "Missing hash parameter")
+	}
+
+	analysis, ok := exploreCache.Get(hash)
+	if !ok {
+		return &cacheExpiredResponse{}
+	}
+
+	path := r.URL.Query().Get("path")
+	method := r.URL.Query().Get("method")
+
+	if path == "" || method == "" {
+		return builder.Error(http.StatusBadRequest, "Missing path or method parameter")
+	}
+
+	// Find the operation
+	var found *walker.OperationInfo
+	for _, op := range analysis.Operations.All {
+		if op.PathTemplate == path && op.Method == method {
+			found = op
+			break
+		}
+	}
+
+	if found == nil {
+		return builder.Error(http.StatusNotFound, "Operation not found")
+	}
+
+	// Build operationID - use the operation's ID or generate one from method+path
+	operationID := found.Operation.OperationID
+	if operationID == "" {
+		// Generate a simple ID from method and path
+		pathID := strings.ReplaceAll(found.PathTemplate, "/", "-")
+		pathID = strings.ReplaceAll(pathID, "{", "")
+		pathID = strings.ReplaceAll(pathID, "}", "")
+		operationID = found.Method + pathID
+	}
+
+	data := map[string]any{
+		"Operation":    found.Operation,
+		"PathTemplate": found.PathTemplate,
+		"Method":       found.Method,
+		"OperationID":  operationID,
+	}
+
+	return h.renderHTML("explore_operation_detail", data)
+}
