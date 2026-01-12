@@ -55,7 +55,105 @@
 
 {{define "explore_operations"}}
 <div class="operations-list">
-    <p class="loading-message">Loading operations...</p>
+    {{if eq .Group "path"}}
+        {{range $path, $ops := .Analysis.Operations.ByPath}}
+        <details class="operation-group" open>
+            <summary class="group-header">
+                <span class="group-title">{{$path}}</span>
+                <span class="group-count">{{len $ops}} operation{{if ne (len $ops) 1}}s{{end}}</span>
+            </summary>
+            <div class="group-content">
+                {{range $ops}}
+                <div class="operation-row"
+                     hx-get="/api/explore/operation?h={{$.Analysis.Hash}}&amp;path={{$path}}&amp;method={{.Method}}"
+                     hx-target="#operation-detail"
+                     hx-swap="innerHTML">
+                    <span class="method-badge method-{{.Method}}">
+                        {{if eq .Method "get"}}<span class="method-glyph" aria-hidden="true">&#8595;</span>{{end}}
+                        {{if eq .Method "post"}}<span class="method-glyph" aria-hidden="true">&#8593;</span>{{end}}
+                        {{if eq .Method "put"}}<span class="method-glyph" aria-hidden="true">&#8594;</span>{{end}}
+                        {{if eq .Method "patch"}}<span class="method-glyph" aria-hidden="true">~</span>{{end}}
+                        {{if eq .Method "delete"}}<span class="method-glyph" aria-hidden="true">&#215;</span>{{end}}
+                        {{.Method}}
+                    </span>
+                    <span class="operation-summary">
+                        {{if .Operation.Summary}}{{.Operation.Summary}}{{else if .Operation.OperationID}}{{.Operation.OperationID}}{{else}}(no summary){{end}}
+                    </span>
+                </div>
+                {{end}}
+            </div>
+        </details>
+        {{else}}
+        <p class="empty-message">No operations found.</p>
+        {{end}}
+    {{else if eq .Group "tag"}}
+        {{if .Analysis.Operations.ByTag}}
+            {{range $tag, $ops := .Analysis.Operations.ByTag}}
+            <details class="operation-group" open>
+                <summary class="group-header">
+                    <span class="group-title">{{$tag}}</span>
+                    <span class="group-count">{{len $ops}} operation{{if ne (len $ops) 1}}s{{end}}</span>
+                </summary>
+                <div class="group-content">
+                    {{range $ops}}
+                    <div class="operation-row"
+                         hx-get="/api/explore/operation?h={{$.Analysis.Hash}}&amp;path={{.PathTemplate}}&amp;method={{.Method}}"
+                         hx-target="#operation-detail"
+                         hx-swap="innerHTML">
+                        <span class="method-badge method-{{.Method}}">
+                            {{if eq .Method "get"}}<span class="method-glyph" aria-hidden="true">&#8595;</span>{{end}}
+                            {{if eq .Method "post"}}<span class="method-glyph" aria-hidden="true">&#8593;</span>{{end}}
+                            {{if eq .Method "put"}}<span class="method-glyph" aria-hidden="true">&#8594;</span>{{end}}
+                            {{if eq .Method "patch"}}<span class="method-glyph" aria-hidden="true">~</span>{{end}}
+                            {{if eq .Method "delete"}}<span class="method-glyph" aria-hidden="true">&#215;</span>{{end}}
+                            {{.Method}}
+                        </span>
+                        <span class="operation-path">{{.PathTemplate}}</span>
+                        <span class="operation-summary">
+                            {{if .Operation.Summary}}{{.Operation.Summary}}{{else if .Operation.OperationID}}{{.Operation.OperationID}}{{else}}(no summary){{end}}
+                        </span>
+                    </div>
+                    {{end}}
+                </div>
+            </details>
+            {{end}}
+        {{else}}
+        <p class="empty-message">No tagged operations found. Operations without tags are not shown in tag view.</p>
+        {{end}}
+    {{else if eq .Group "method"}}
+        {{range $method, $ops := .Analysis.Operations.ByMethod}}
+        <details class="operation-group" open>
+            <summary class="group-header">
+                <span class="method-badge method-{{$method}}">
+                    {{if eq $method "get"}}<span class="method-glyph" aria-hidden="true">&#8595;</span>{{end}}
+                    {{if eq $method "post"}}<span class="method-glyph" aria-hidden="true">&#8593;</span>{{end}}
+                    {{if eq $method "put"}}<span class="method-glyph" aria-hidden="true">&#8594;</span>{{end}}
+                    {{if eq $method "patch"}}<span class="method-glyph" aria-hidden="true">~</span>{{end}}
+                    {{if eq $method "delete"}}<span class="method-glyph" aria-hidden="true">&#215;</span>{{end}}
+                    {{$method}}
+                </span>
+                <span class="group-count">{{len $ops}} operation{{if ne (len $ops) 1}}s{{end}}</span>
+            </summary>
+            <div class="group-content">
+                {{range $ops}}
+                <div class="operation-row"
+                     hx-get="/api/explore/operation?h={{$.Analysis.Hash}}&amp;path={{.PathTemplate}}&amp;method={{.Method}}"
+                     hx-target="#operation-detail"
+                     hx-swap="innerHTML">
+                    <span class="operation-path">{{.PathTemplate}}</span>
+                    <span class="operation-summary">
+                        {{if .Operation.Summary}}{{.Operation.Summary}}{{else if .Operation.OperationID}}{{.Operation.OperationID}}{{else}}(no summary){{end}}
+                    </span>
+                </div>
+                {{end}}
+            </div>
+        </details>
+        {{else}}
+        <p class="empty-message">No operations found.</p>
+        {{end}}
+    {{else}}
+        <p class="empty-message">Unknown grouping: {{.Group}}</p>
+    {{end}}
 </div>
 {{end}}
 

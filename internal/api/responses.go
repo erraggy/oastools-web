@@ -26,6 +26,18 @@ func (r *htmlResponse) WriteTo(w http.ResponseWriter) error {
 	return err
 }
 
+// cacheExpiredResponse implements builder.Response for cache expiry with HX-Trigger.
+type cacheExpiredResponse struct{}
+
+func (r *cacheExpiredResponse) StatusCode() int      { return http.StatusGone }
+func (r *cacheExpiredResponse) Headers() http.Header { return nil }
+func (r *cacheExpiredResponse) Body() any            { return nil }
+func (r *cacheExpiredResponse) WriteTo(w http.ResponseWriter) error {
+	w.Header().Set("HX-Trigger", "cacheExpired")
+	w.WriteHeader(http.StatusGone)
+	return nil
+}
+
 // renderHTML renders a partial template to an HTML response.
 func (h *Handler) renderHTML(templateName string, data any) builder.Response {
 	var buf bytes.Buffer

@@ -388,8 +388,29 @@ func computeExploreStats(
 }
 
 // handleExploreOperations renders the operations tab partial.
-func (h *Handler) handleExploreOperations(_ context.Context, _ *builder.Request) builder.Response {
-	return builder.Error(http.StatusNotImplemented, "Not implemented")
+func (h *Handler) handleExploreOperations(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+	hash := r.URL.Query().Get("h")
+	if hash == "" {
+		return builder.Error(http.StatusBadRequest, "Missing hash parameter")
+	}
+
+	analysis, ok := exploreCache.Get(hash)
+	if !ok {
+		return &cacheExpiredResponse{}
+	}
+
+	group := r.URL.Query().Get("group")
+	if group == "" {
+		group = "path"
+	}
+
+	data := map[string]any{
+		"Analysis": analysis,
+		"Group":    group,
+	}
+
+	return h.renderHTML("explore_operations", data)
 }
 
 // handleExploreSchemas renders the schemas tab partial.

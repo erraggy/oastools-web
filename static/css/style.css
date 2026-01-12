@@ -615,3 +615,245 @@ small {
     color: var(--color-text-muted);
     margin-bottom: 1.5rem;
 }
+
+/* Explore page styles */
+.explore-container {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+}
+
+.explore-summary {
+    margin-bottom: 1.5rem;
+}
+
+.summary-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.summary-version {
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.summary-filename {
+    color: var(--color-text-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.875rem;
+}
+
+.summary-stats {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.875rem;
+}
+
+.stat {
+    color: var(--color-text-muted);
+}
+
+.stat strong {
+    color: var(--color-text);
+}
+
+/* Explore tabs */
+.explore-tabs {
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.tab-buttons {
+    display: flex;
+    gap: 0;
+}
+
+.tab-btn {
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-family: inherit;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.tab-btn:hover {
+    color: var(--color-text);
+}
+
+.tab-btn.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.tab-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.tab-controls label {
+    color: var(--color-text-muted);
+}
+
+.tab-controls select {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 0.875rem;
+}
+
+.tab-content {
+    min-height: 200px;
+}
+
+.loading-message,
+.empty-message {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    padding: 1rem 0;
+}
+
+/* Operations list */
+.operations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.operation-group {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.operation-group[open] {
+    border-color: var(--color-primary);
+}
+
+.group-header {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    list-style: none;
+    background: var(--color-bg);
+    border-radius: var(--radius);
+}
+
+.operation-group[open] .group-header {
+    border-bottom: 1px solid var(--color-border);
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.group-header::-webkit-details-marker {
+    display: none;
+}
+
+.group-title {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.group-count {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+.group-content {
+    padding: 0.5rem;
+}
+
+.operation-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: calc(var(--radius) - 2px);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.operation-row:hover {
+    background: var(--color-bg);
+}
+
+/* Method badges */
+.method-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    min-width: 4rem;
+    justify-content: center;
+}
+
+.method-glyph {
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.method-get {
+    background: color-mix(in srgb, var(--color-success) 15%, transparent);
+    color: var(--color-success);
+}
+
+.method-post {
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+}
+
+.method-put {
+    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
+}
+
+.method-patch {
+    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
+}
+
+.method-delete {
+    background: color-mix(in srgb, var(--color-error) 15%, transparent);
+    color: var(--color-error);
+}
+
+.method-options,
+.method-head {
+    background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
+    color: var(--color-text-muted);
+}
+
+.operation-path {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+}
+
+.operation-summary {
+    font-size: 0.875rem;
+    color: var(--color-text);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
