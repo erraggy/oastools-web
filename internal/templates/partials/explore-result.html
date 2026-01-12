@@ -212,6 +212,66 @@
 </div>
 {{end}}
 
+{{define "explore_schema_detail"}}
+<div class="detail-card" id="schema-{{.Name}}">
+    <div class="detail-header">
+        <span class="schema-name">{{.Name}}</span>
+        <span class="type-badge">{{template "schema_type_badge" .Schema}}</span>
+    </div>
+
+    {{if .Schema.Description}}
+    <p class="detail-description">{{.Schema.Description}}</p>
+    {{end}}
+
+    {{if .Schema.Properties}}
+    <div class="detail-section">
+        <h4>Properties</h4>
+        <table class="props-table">
+            <thead>
+                <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                {{$required := .Schema.Required}}
+                {{range $name, $prop := .Schema.Properties}}
+                <tr>
+                    <td><code>{{$name}}</code></td>
+                    <td>
+                        {{if $prop.Ref}}<a href="#schema-{{schemaName $prop.Ref}}">{{schemaName $prop.Ref}}</a>
+                        {{else}}{{formatType $prop.Type}}{{if $prop.Format}} ({{$prop.Format}}){{end}}{{end}}
+                    </td>
+                    <td>{{if contains $required $name}}Yes{{else}}No{{end}}</td>
+                    <td>{{$prop.Description}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{end}}
+
+    {{if .Schema.Enum}}
+    <div class="detail-section">
+        <h4>Enum Values</h4>
+        <ul class="enum-list">{{range .Schema.Enum}}<li><code>{{.}}</code></li>{{end}}</ul>
+    </div>
+    {{end}}
+
+    {{if .UsedIn}}
+    <div class="detail-section">
+        <h4>Used In</h4>
+        <ul class="used-in-list">
+            {{range .UsedIn}}
+            <li>
+                <span class="method-badge method-{{.Method}}">{{.Method}}</span>
+                <span>{{.PathTemplate}}</span>
+                <span class="usage-context">({{.Context}})</span>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
 {{define "explore_operation_detail"}}
 <div class="detail-card" id="op-{{.OperationID}}">
     <div class="detail-header">

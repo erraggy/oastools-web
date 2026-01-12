@@ -58,6 +58,13 @@ type OAuthFlowInfo struct {
 	Scopes           map[string]string
 }
 
+// SchemaUsage represents where a schema is used.
+type SchemaUsage struct {
+	Method       string
+	PathTemplate string
+	Context      string // e.g., "request body", "response 200"
+}
+
 // Cache for explore analysis results (2 minute TTL).
 var exploreCache = NewTTLCache[string, *ExploreAnalysis](2 * time.Minute)
 
@@ -487,4 +494,85 @@ func (h *Handler) handleExploreOperationDetail(_ context.Context, req *builder.R
 	}
 
 	return h.renderHTML("explore_operation_detail", data)
+}
+
+// handleExploreSchemaDetail renders the schema detail partial.
+func (h *Handler) handleExploreSchemaDetail(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+	hash := r.URL.Query().Get("h")
+	if hash == "" {
+		return builder.Error(http.StatusBadRequest, "Missing hash parameter")
+	}
+
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		return builder.Error(http.StatusBadRequest, "Missing name parameter")
+	}
+
+	analysis, ok := exploreCache.Get(hash)
+	if !ok {
+		return &cacheExpiredResponse{}
+	}
+
+	// Find schema in components by name
+	var foundSchema *parser.Schema
+	for _, schemaInfo := range analysis.Schemas.Components {
+		if schemaInfo.Name == name {
+			foundSchema = schemaInfo.Schema
+			break
+		}
+	}
+
+	if foundSchema == nil {
+		return builder.Error(http.StatusNotFound, "Schema not found")
+	}
+
+	// Find usages of this schema
+	usages := findSchemaUsages(analysis, name)
+
+	data := map[string]any{
+		"Name":   name,
+		"Schema": foundSchema,
+		"UsedIn": usages,
+	}
+
+	return h.renderHTML("explore_schema_detail", data)
+}
+
+// findSchemaUsages finds all operations that reference the given schema.
+func findSchemaUsages(analysis *ExploreAnalysis, schemaName string) []SchemaUsage {
+	var usages []SchemaUsage
+	refSuffix := "/" + schemaName
+
+	for _, op := range analysis.Operations.All {
+		// Check request body
+		if op.Operation.RequestBody != nil {
+			for _, mt := range op.Operation.RequestBody.Content {
+				if mt.Schema != nil && strings.HasSuffix(mt.Schema.Ref, refSuffix) {
+					usages = append(usages, SchemaUsage{
+						Method:       op.Method,
+						PathTemplate: op.PathTemplate,
+						Context:      "request body",
+					})
+				}
+			}
+		}
+
+		// Check responses - note: Responses has Codes map and Default
+		if op.Operation.Responses != nil {
+			for status, resp := range op.Operation.Responses.Codes {
+				for _, mt := range resp.Content {
+					if mt.Schema != nil && strings.HasSuffix(mt.Schema.Ref, refSuffix) {
+						usages = append(usages, SchemaUsage{
+							Method:       op.Method,
+							PathTemplate: op.PathTemplate,
+							Context:      "response " + status,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return usages
 }

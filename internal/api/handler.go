@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -50,6 +51,8 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		},
 		// join concatenates slice elements with a separator
 		"join": strings.Join,
+		// contains checks if a string slice contains a specific item
+		"contains": slices.Contains[[]string, string],
 		// propNames returns sorted property names from a schema properties map
 		"propNames": func(props map[string]*parser.Schema) []string {
 			names := make([]string, 0, len(props))

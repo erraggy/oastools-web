@@ -291,4 +291,33 @@ func (h *Handler) registerOperations(srv *builder.ServerBuilder) {
 		),
 		builder.WithHandler(h.handleExploreOperationDetail),
 	)
+
+	// GET /api/explore/schema - retrieve schema details from cached analysis
+	srv.AddOperation(http.MethodGet, "/api/explore/schema",
+		builder.WithOperationID("exploreSchemaDetail"),
+		builder.WithSummary("Get schema details from analyzed specification"),
+		builder.WithDescription("Returns the full details of a specific schema from a previously analyzed specification."),
+		builder.WithTags("explore"),
+		builder.WithQueryParam("h", "string",
+			builder.WithParamDescription("Hash of the cached analysis"),
+			builder.WithParamRequired(true),
+		),
+		builder.WithQueryParam("name", "string",
+			builder.WithParamDescription("Name of the schema"),
+			builder.WithParamRequired(true),
+		),
+		builder.WithResponse(http.StatusOK, nil,
+			builder.WithResponseDescription("Schema details"),
+		),
+		builder.WithResponse(http.StatusBadRequest, ErrorResponse{},
+			builder.WithResponseDescription("Missing required parameters"),
+		),
+		builder.WithResponse(http.StatusNotFound, ErrorResponse{},
+			builder.WithResponseDescription("Schema or analysis not found"),
+		),
+		builder.WithResponse(http.StatusGone, nil,
+			builder.WithResponseDescription("Analysis cache expired"),
+		),
+		builder.WithHandler(h.handleExploreSchemaDetail),
+	)
 }
