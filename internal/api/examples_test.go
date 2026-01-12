@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/erraggy/oastools/builder"
+	"github.com/erraggy/oastools/parser"
+	"github.com/erraggy/oastools-web/static/examples"
 )
 
 func TestHandleGetExample(t *testing.T) {
@@ -165,6 +167,75 @@ func TestExampleLabel(t *testing.T) {
 			got := exampleLabel(tt.input)
 			if got != tt.want {
 				t.Errorf("exampleLabel(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHandleListExamples_ContainsExpected(t *testing.T) {
+	h := minimalHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/examples", nil)
+	builderReq := &builder.Request{HTTPRequest: req}
+
+	resp := h.handleListExamples(context.Background(), builderReq)
+
+	if resp.StatusCode() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode(), http.StatusOK)
+	}
+
+	// Verify response contains all expected examples
+	body := resp.Body()
+	list, ok := body.([]ExampleMetadata)
+	if !ok {
+		t.Fatalf("expected []ExampleMetadata, got %T", body)
+	}
+
+	expectedExamples := []string{
+		"petstore-3.0", "petstore-2.0", "petstore-warnings", "petstore-errors",
+		"petstore-v2", "petstore-v3", "petstore-messy", "petstore-full",
+		"users-api", "products-api", "orders-api", "inventory-api",
+		"overlay-descriptions", "overlay-security", "overlay-public",
+	}
+	for _, ex := range expectedExamples {
+		found := false
+		for _, item := range list {
+			if item.Name == ex {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("response missing example %q", ex)
+		}
+	}
+}
+
+func TestExampleSpecsAreValid(t *testing.T) {
+	entries, err := examples.FS.ReadDir(".")
+	if err != nil {
+		t.Fatalf("failed to read examples: %v", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+			continue
+		}
+		// Skip overlay files - they're not full specs
+		if strings.HasPrefix(entry.Name(), "overlay-") {
+			continue
+		}
+
+		t.Run(entry.Name(), func(t *testing.T) {
+			content, err := examples.FS.ReadFile(entry.Name())
+			if err != nil {
+				t.Fatalf("failed to read %s: %v", entry.Name(), err)
+			}
+
+			_, err = parser.ParseWithOptions(parser.WithBytes(content))
+			// Allow errors spec to fail parsing (it has intentional errors)
+			if err != nil && !strings.Contains(entry.Name(), "errors") {
+				t.Errorf("failed to parse %s: %v", entry.Name(), err)
 			}
 		})
 	}
