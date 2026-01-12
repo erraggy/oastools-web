@@ -97,3 +97,37 @@ function removeFileInput(button) {
         button.parentElement.remove();
     }
 }
+
+// Load example spec into input section
+async function loadExample(select, fieldName) {
+    const exampleName = select.value;
+    if (!exampleName) return;
+
+    const section = select.closest('.input-section');
+    if (!section) return;
+
+    try {
+        const response = await fetch(`/api/examples/${exampleName}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load example: ${response.statusText}`);
+        }
+        const content = await response.text();
+
+        // Switch to paste mode
+        switchInputMode(section, 'paste');
+
+        // Find and populate the textarea
+        const textarea = section.querySelector('textarea');
+        if (textarea) {
+            textarea.value = content;
+            textarea.disabled = false;
+        }
+
+        // Reset the select
+        select.value = '';
+    } catch (error) {
+        console.error('Failed to load example:', error);
+        alert('Failed to load example. Please try again.');
+        select.value = '';
+    }
+}
