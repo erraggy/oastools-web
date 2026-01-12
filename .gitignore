@@ -12,3 +12,6 @@ server
 node_modules/
 test-results/
 playwright-report/
+
+# Git worktrees
+.worktrees/
