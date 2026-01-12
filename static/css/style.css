@@ -908,6 +908,26 @@ small {
     gap: 1rem;
 }
 
+/* Schema panel layout - 2 columns like operations */
+.schemas-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (width <= 900px) {
+    .schemas-panel {
+        grid-template-columns: 1fr;
+    }
+}
+
+.schema-detail {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
 .schemas-header,
 .security-header {
     display: flex;
@@ -1361,4 +1381,24 @@ small {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+}
+
+/* Security panel layout - 2 columns like operations */
+.security-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (width <= 900px) {
+    .security-panel {
+        grid-template-columns: 1fr;
+    }
+}
+
+.security-detail {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
 }

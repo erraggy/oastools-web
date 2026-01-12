@@ -79,8 +79,8 @@ type UnsecuredOperation struct {
 	Summary      string
 }
 
-// Cache for explore analysis results (2 minute TTL).
-var exploreCache = NewTTLCache[string, *ExploreAnalysis](2 * time.Minute)
+// Cache for explore analysis results (5 minute TTL).
+var exploreCache = NewTTLCache[string, *ExploreAnalysis](5 * time.Minute)
 
 // handleExploreUpload handles spec upload and analysis.
 func (h *Handler) handleExploreUpload(_ context.Context, req *builder.Request) builder.Response {

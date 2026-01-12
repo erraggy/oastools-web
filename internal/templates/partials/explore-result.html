@@ -188,22 +188,26 @@
 
     <div id="inline-schemas-list"></div>
 
-    <div class="schemas-list">
-        {{$hash := .Analysis.Hash}}
-        {{range .Analysis.Schemas.Components}}
-        <div class="schema-row"
-             hx-get="/api/explore/schema?h={{$hash}}&amp;name={{.Name | urlquery}}"
-             hx-target="#schema-detail"
-             hx-swap="innerHTML">
-            <span class="schema-name">{{.Name}}</span>
-            <span class="type-badge">{{template "schema_type_badge" .Schema}}</span>
-            <span class="schema-preview">{{template "schema_preview" .Schema}}</span>
-            <span class="schema-arrow">→</span>
+    <div class="schemas-panel">
+        <div class="schemas-list">
+            {{$hash := .Analysis.Hash}}
+            {{range .Analysis.Schemas.Components}}
+            <div class="schema-row"
+                 hx-get="/api/explore/schema?h={{$hash}}&amp;name={{.Name | urlquery}}"
+                 hx-target="#schema-detail"
+                 hx-swap="innerHTML">
+                <span class="schema-name">{{.Name}}</span>
+                <span class="type-badge">{{template "schema_type_badge" .Schema}}</span>
+                <span class="schema-preview">{{template "schema_preview" .Schema}}</span>
+                <span class="schema-arrow">→</span>
+            </div>
+            {{end}}
         </div>
-        {{end}}
-    </div>
 
-    <div id="schema-detail"></div>
+        <div id="schema-detail" class="schema-detail">
+            <p class="empty-message">Select a schema to view details.</p>
+        </div>
+    </div>
 </div>
 {{end}}
 
@@ -232,43 +236,47 @@
 
     <div id="unsecured-list"></div>
 
-    {{if .Analysis.Security}}
-    <div class="security-list">
-        {{$hash := .Analysis.Hash}}
-        {{range .Analysis.Security}}
-        <div class="security-row"
-             hx-get="/api/explore/security-detail?h={{$hash}}&amp;name={{.Name | urlquery}}"
-             hx-target="#security-detail"
-             hx-swap="innerHTML">
-            <div class="security-main">
-                <span class="security-name">{{.Name}}</span>
-                <span class="security-type-badge">[{{.Type}}]</span>
+    <div class="security-panel">
+        {{if .Analysis.Security}}
+        <div class="security-list">
+            {{$hash := .Analysis.Hash}}
+            {{range .Analysis.Security}}
+            <div class="security-row"
+                 hx-get="/api/explore/security-detail?h={{$hash}}&amp;name={{.Name | urlquery}}"
+                 hx-target="#security-detail"
+                 hx-swap="innerHTML">
+                <div class="security-main">
+                    <span class="security-name">{{.Name}}</span>
+                    <span class="security-type-badge">[{{.Type}}]</span>
+                </div>
+                <div class="security-config">
+                    {{if eq .Type "apiKey"}}
+                    {{.In}}: {{.ParamName}}
+                    {{else if eq .Type "http"}}
+                    scheme: {{.Scheme}}
+                    {{else if eq .Type "oauth2"}}
+                    {{range .Flows}}{{.Type}} flow{{if not (eq .Type "")}} {{end}}{{end}}
+                    {{else if eq .Type "openIdConnect"}}
+                    OpenID Connect
+                    {{end}}
+                </div>
+                <div class="security-usage">
+                    Used by {{.UsageCount}} operations
+                </div>
+                <span class="security-arrow">-></span>
             </div>
-            <div class="security-config">
-                {{if eq .Type "apiKey"}}
-                {{.In}}: {{.ParamName}}
-                {{else if eq .Type "http"}}
-                scheme: {{.Scheme}}
-                {{else if eq .Type "oauth2"}}
-                {{range .Flows}}{{.Type}} flow{{if not (eq .Type "")}} {{end}}{{end}}
-                {{else if eq .Type "openIdConnect"}}
-                OpenID Connect
-                {{end}}
-            </div>
-            <div class="security-usage">
-                Used by {{.UsageCount}} operations
-            </div>
-            <span class="security-arrow">-></span>
+            {{end}}
+        </div>
+        {{else}}
+        <div class="no-security">
+            No security schemes defined
         </div>
         {{end}}
-    </div>
-    {{else}}
-    <div class="no-security">
-        No security schemes defined
-    </div>
-    {{end}}
 
-    <div id="security-detail"></div>
+        <div id="security-detail" class="security-detail">
+            <p class="empty-message">Select a security scheme to view details.</p>
+        </div>
+    </div>
 </div>
 {{end}}
 
