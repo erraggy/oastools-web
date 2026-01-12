@@ -17,6 +17,7 @@ A web application for working with OpenAPI specifications. Powered by the [oasto
 | **Fix** | Automatically repair common spec issues with dry-run preview |
 | **Join** | Merge multiple specs into a single document with collision strategies |
 | **Overlay** | Apply overlay documents to modify specs |
+| **Explore** | Analyze spec structure, endpoints, schemas, and dependencies |
 
 All operations support:
 - File upload, paste, or URL input
