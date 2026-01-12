@@ -5,11 +5,152 @@
 {{define "content"}}
 <section class="operation-page">
     <h1>Explore OpenAPI Specification</h1>
-    <p>Upload a specification to browse its operations, schemas, and security configuration.</p>
+    <p>Analyze the structure of your OpenAPI specification.</p>
 
-    <div class="coming-soon">
-        <p><strong>Coming Soon</strong></p>
-        <p>This feature is under development. Check back soon!</p>
+    <form id="explore-form"
+          hx-post="/api/explore"
+          hx-target="#explore-results"
+          hx-indicator="#spinner"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data">
+
+        <div class="input-section" data-field="spec">
+            <label>Specification</label>
+            <div class="input-tabs">
+                <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">Upload File</button>
+                <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste Content</button>
+                <button type="button" class="input-tab" data-mode="url" onclick="switchInputMode(this.closest('.input-section'), 'url')">Fetch URL</button>
+            </div>
+            <div class="input-content" data-mode="file">
+                <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" data-required="true" required>
+                <small>Accepts JSON or YAML files up to 2MB</small>
+            </div>
+            <div class="input-content hidden" data-mode="paste">
+                <textarea name="spec_content" rows="12" placeholder="Paste your OpenAPI specification here (JSON or YAML)..." disabled></textarea>
+                <small>Paste JSON or YAML content directly</small>
+            </div>
+            <div class="input-content hidden" data-mode="url">
+                <input type="url" name="spec_url" placeholder="https://example.com/openapi.yaml" disabled>
+                <small>Fetch specification from a public URL</small>
+            </div>
+            <input type="hidden" name="input_mode" value="file">
+        </div>
+
+        <input type="hidden" name="hash" id="explore-hash" value="">
+
+        <button type="submit" class="btn">
+            Explore
+            <span id="spinner" class="spinner htmx-indicator"></span>
+        </button>
+    </form>
+
+    <div id="explore-results">
+        {{if .Analysis}}
+        {{template "explore_results" .}}
+        {{end}}
     </div>
+
+    <details class="usage-docs">
+        <summary>Usage Examples</summary>
+        <div class="docs-content">
+            <h4>Go Library</h4>
+            <pre><code class="language-go">import "github.com/erraggy/oastools/parser"
+
+// Parse and explore the specification
+result, err := parser.ParseWithOptions(
+    parser.WithFilePath("openapi.yaml"),
+    parser.WithResolveRefs(true),
+)
+
+// Access paths and operations
+for path, item := range result.Document.Paths {
+    fmt.Printf("Path: %s\n", path)
+}
+
+// Access schemas
+for name, schema := range result.Document.Components.Schemas {
+    fmt.Printf("Schema: %s\n", name)
+}</code></pre>
+
+            <h4>CLI</h4>
+            <pre><code class="language-bash"># Explore specification structure
+oastools info openapi.yaml
+
+# List all paths
+oastools info --paths openapi.yaml
+
+# List all schemas
+oastools info --schemas openapi.yaml</code></pre>
+
+            <p>
+                <a href="https://erraggy.github.io/oastools/packages/parser/" target="_blank" rel="noopener">Full documentation</a>
+                · <a href="https://pkg.go.dev/github.com/erraggy/oastools/parser" target="_blank" rel="noopener">pkg.go.dev</a>
+            </p>
+        </div>
+    </details>
 </section>
+{{end}}
+
+{{define "explore_results"}}
+<div class="explore-container" data-hash="{{.Analysis.Hash}}">
+    <div class="explore-summary">
+        <div class="summary-header">
+            <span class="summary-version">{{.Analysis.Version}}</span>
+            <span class="summary-filename">{{.Analysis.Filename}}</span>
+        </div>
+        <div class="summary-stats">
+            <span class="stat">Paths: <strong>{{.Analysis.Stats.PathCount}}</strong></span>
+            <span class="stat">Operations: <strong>{{.Analysis.Stats.OperationCount}}</strong></span>
+            <span class="stat">Schemas: <strong>{{.Analysis.Stats.SchemaCount}}</strong></span>
+        </div>
+        <button type="button" class="summary-expand-btn"
+                hx-get="/api/explore/summary-details?h={{.Analysis.Hash}}"
+                hx-target="#summary-details"
+                hx-swap="innerHTML">
+            <span class="expand-icon">&#9660;</span> Details
+        </button>
+        <div id="summary-details"></div>
+    </div>
+
+    <div class="explore-tabs">
+        <div class="tab-buttons">
+            <button type="button" class="tab-btn active" data-tab="operations"
+                    hx-get="/api/explore/operations?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML">
+                Operations
+            </button>
+            <button type="button" class="tab-btn" data-tab="schemas"
+                    hx-get="/api/explore/schemas?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML">
+                Schemas
+            </button>
+            <button type="button" class="tab-btn" data-tab="security"
+                    hx-get="/api/explore/security?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML">
+                Security
+            </button>
+        </div>
+        <div class="tab-controls">
+            <label for="group-by">Group by:</label>
+            <select id="group-by" name="group"
+                    hx-get="/api/explore/operations?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    hx-include="this">
+                <option value="path" selected>Path</option>
+                <option value="tag">Tag</option>
+                <option value="method">Method</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="tab-content" class="tab-content">
+        {{template "explore_operations" .}}
+    </div>
+
+    <div id="detail-section" class="detail-section"></div>
+</div>
 {{end}}
