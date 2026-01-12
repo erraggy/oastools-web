@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/erraggy/oastools-web/static/examples"
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/parser"
-	"github.com/erraggy/oastools-web/static/examples"
 )
 
 func TestHandleGetExample(t *testing.T) {
