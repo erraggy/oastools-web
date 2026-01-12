@@ -1,0 +1,72 @@
+{{define "explore_results"}}
+<div class="explore-container" data-hash="{{.Analysis.Hash}}">
+    <div class="explore-summary">
+        <div class="summary-header">
+            <span class="summary-version">{{.Analysis.Version}}</span>
+            <span class="summary-filename">{{.Analysis.Filename}}</span>
+        </div>
+        <div class="summary-stats">
+            <span class="stat">Paths: <strong>{{.Analysis.Stats.PathCount}}</strong></span>
+            <span class="stat">Operations: <strong>{{.Analysis.Stats.OperationCount}}</strong></span>
+            <span class="stat">Schemas: <strong>{{.Analysis.Stats.SchemaCount}}</strong></span>
+        </div>
+    </div>
+
+    <div class="explore-tabs">
+        <div class="tab-buttons">
+            <button type="button" class="tab-btn active" data-tab="operations"
+                    hx-get="/api/explore/operations?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML">
+                Operations ({{.Analysis.Stats.OperationCount}})
+            </button>
+            <button type="button" class="tab-btn" data-tab="schemas"
+                    hx-get="/api/explore/schemas?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML">
+                Schemas ({{.Analysis.Stats.SchemaCount}})
+            </button>
+            <button type="button" class="tab-btn" data-tab="security"
+                    hx-get="/api/explore/security?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML">
+                Security ({{len .Analysis.Security}})
+            </button>
+        </div>
+        <div class="tab-controls">
+            <label for="group-by">Group by:</label>
+            <select id="group-by" name="group"
+                    hx-get="/api/explore/operations?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    hx-include="this">
+                <option value="path" selected>Path</option>
+                <option value="tag">Tag</option>
+                <option value="method">Method</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="tab-content" class="tab-content">
+        <p class="loading-message">Click a tab above to explore the specification.</p>
+    </div>
+</div>
+{{end}}
+
+{{define "explore_operations"}}
+<div class="operations-list">
+    <p class="loading-message">Loading operations...</p>
+</div>
+{{end}}
+
+{{define "explore_schemas"}}
+<div class="schemas-list">
+    <p class="loading-message">Loading schemas...</p>
+</div>
+{{end}}
+
+{{define "explore_security"}}
+<div class="security-list">
+    <p class="loading-message">Loading security schemes...</p>
+</div>
+{{end}}
