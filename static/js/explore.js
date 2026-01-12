@@ -82,7 +82,7 @@
         let parsed;
         try {
             parsed = JSON.parse(storedData);
-        } catch (e) {
+        } catch {
             showCacheMissMessage(evt.detail.target);
             return;
         }
