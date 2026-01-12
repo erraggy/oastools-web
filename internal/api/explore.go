@@ -504,7 +504,10 @@ func (h *Handler) handleExploreOperationDetail(_ context.Context, req *builder.R
 	}
 
 	// Build operationID - use the operation's ID or generate one from method+path
-	operationID := found.Operation.OperationID
+	var operationID string
+	if found.Operation != nil {
+		operationID = found.Operation.OperationID
+	}
 	if operationID == "" {
 		// Generate a simple ID from method and path
 		pathID := strings.ReplaceAll(found.PathTemplate, "/", "-")
