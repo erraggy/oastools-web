@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +50,43 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		},
 		// join concatenates slice elements with a separator
 		"join": strings.Join,
+		// propNames returns sorted property names from a schema properties map
+		"propNames": func(props map[string]*parser.Schema) []string {
+			names := make([]string, 0, len(props))
+			for name := range props {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			return names
+		},
+		// isSchema checks if the value is a *parser.Schema (vs bool for OAS 3.1+)
+		"isSchema": func(v any) bool {
+			_, ok := v.(*parser.Schema)
+			return ok
+		},
+		// formatType handles OAS 3.1+ type arrays (e.g., ["string", "null"])
+		"formatType": func(t any) string {
+			switch v := t.(type) {
+			case string:
+				return v
+			case []any:
+				var types []string
+				for _, item := range v {
+					if s, ok := item.(string); ok && s != "null" {
+						types = append(types, s)
+					}
+				}
+				if len(types) == 0 {
+					return "null"
+				}
+				if len(types) == 1 {
+					return types[0]
+				}
+				return strings.Join(types, "|")
+			default:
+				return ""
+			}
+		},
 	}
 
 	// Parse partials for result rendering with custom functions

@@ -414,8 +414,21 @@ func (h *Handler) handleExploreOperations(_ context.Context, req *builder.Reques
 }
 
 // handleExploreSchemas renders the schemas tab partial.
-func (h *Handler) handleExploreSchemas(_ context.Context, _ *builder.Request) builder.Response {
-	return builder.Error(http.StatusNotImplemented, "Not implemented")
+func (h *Handler) handleExploreSchemas(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+	hash := r.URL.Query().Get("h")
+	if hash == "" {
+		return builder.Error(http.StatusBadRequest, "Missing hash parameter")
+	}
+
+	analysis, ok := exploreCache.Get(hash)
+	if !ok {
+		return &cacheExpiredResponse{}
+	}
+
+	return h.renderHTML("explore_schemas", map[string]any{
+		"Analysis": analysis,
+	})
 }
 
 // handleExploreSecurity renders the security tab partial.

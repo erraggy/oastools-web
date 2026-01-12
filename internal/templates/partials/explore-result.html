@@ -163,10 +163,48 @@
 {{end}}
 
 {{define "explore_schemas"}}
-<div class="schemas-list">
-    <p class="loading-message">Loading schemas...</p>
+<div class="schemas-container">
+    <div class="schemas-header">
+        <span class="schemas-count">Component Schemas ({{len .Analysis.Schemas.Components}})</span>
+        <span class="inline-count">
+            Inline Schemas: {{.Analysis.Stats.InlineCount}}
+            {{if gt .Analysis.Stats.InlineCount 0}}
+            <button type="button" class="inline-expand-btn"
+                    hx-get="/api/explore/inline-schemas?h={{.Analysis.Hash}}"
+                    hx-target="#inline-schemas-list"
+                    hx-swap="innerHTML">
+                Show locations
+            </button>
+            {{end}}
+        </span>
+    </div>
+
+    <div id="inline-schemas-list"></div>
+
+    <div class="schemas-list">
+        {{$hash := .Analysis.Hash}}
+        {{range .Analysis.Schemas.Components}}
+        <div class="schema-row"
+             hx-get="/api/explore/schema?h={{$hash}}&amp;name={{.Name | urlquery}}"
+             hx-target="#schema-detail"
+             hx-swap="innerHTML">
+            <span class="schema-name">{{.Name}}</span>
+            <span class="type-badge">{{template "schema_type_badge" .Schema}}</span>
+            <span class="schema-preview">{{template "schema_preview" .Schema}}</span>
+            <span class="schema-arrow">→</span>
+        </div>
+        {{end}}
+    </div>
+
+    <div id="schema-detail"></div>
 </div>
 {{end}}
+
+{{define "schema_type_badge"}}{{if .Enum}}[enum]{{else if eq (formatType .Type) "array"}}[array]{{else if .AllOf}}{allOf}{{else if .OneOf}}{oneOf}{{else if .AnyOf}}{anyOf}{{else if .Properties}}{object}{{else}}{{formatType .Type}}{{end}}{{end}}
+
+{{define "schema_preview"}}{{if .Properties}}{{range $i, $name := propNames .Properties}}{{if $i}}, {{end}}{{$name}}{{if ge $i 3}}...{{break}}{{end}}{{end}}{{else if .Enum}}{{range $i, $v := .Enum}}{{if $i}}, {{end}}{{$v}}{{if ge $i 4}}...{{break}}{{end}}{{end}}{{else if eq (formatType .Type) "array"}}→ {{if .Items}}{{template "schema_items_type" .Items}}{{end}}{{end}}{{end}}
+
+{{define "schema_items_type"}}{{if isSchema .}}{{if .Ref}}{{schemaName .Ref}}{{else}}{{formatType .Type}}{{end}}{{end}}{{end}}
 
 {{define "explore_security"}}
 <div class="security-list">
