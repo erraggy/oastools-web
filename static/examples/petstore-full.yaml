@@ -1,0 +1,1004 @@
+openapi: "3.0.3"
+info:
+  title: Petstore - Full Featured
+  version: "1.0.0"
+  description: |
+    Extended Petstore API demonstrating all OpenAPI 3.0 features.
+
+    This specification includes:
+    - Multiple servers with variables
+    - Security schemes (API key, OAuth2)
+    - Callbacks and webhooks
+    - Links between operations
+    - Examples on operations and schemas
+    - Custom extensions (x-*)
+    - Polymorphism with discriminator
+    - Composition (oneOf, anyOf, allOf)
+  termsOfService: https://petstore.example.com/terms
+  contact:
+    name: API Support
+    url: https://petstore.example.com/support
+    email: support@petstore.example.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  x-logo:
+    url: https://petstore.example.com/logo.png
+    altText: Petstore Logo
+
+externalDocs:
+  description: Find out more about the Petstore API
+  url: https://petstore.example.com/docs
+
+tags:
+  - name: pets
+    description: Everything about your Pets
+    externalDocs:
+      description: Find out more
+      url: https://petstore.example.com/docs/pets
+  - name: store
+    description: Access to Petstore orders
+    externalDocs:
+      description: Find out more about our store
+      url: https://petstore.example.com/docs/store
+  - name: users
+    description: Operations about users
+    x-internal: false
+
+servers:
+  - url: https://{environment}.petstore.example.com/api/{version}
+    description: Main API server
+    variables:
+      environment:
+        default: api
+        enum:
+          - api
+          - staging
+          - sandbox
+        description: Server environment
+      version:
+        default: v1
+        enum:
+          - v1
+          - v2
+        description: API version
+  - url: https://localhost:8080/api/v1
+    description: Local development server
+
+security:
+  - ApiKeyAuth: []
+  - OAuth2:
+      - read:pets
+      - write:pets
+
+paths:
+  /pets:
+    get:
+      tags:
+        - pets
+      summary: List all pets
+      description: Returns a paginated list of all pets in the store
+      operationId: listPets
+      x-rate-limit: 100
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of pets to return
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 10
+        - name: offset
+          in: query
+          description: Number of pets to skip
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: status
+          in: query
+          description: Filter by pet status
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - available
+                - pending
+                - sold
+          style: form
+          explode: true
+        - name: X-Request-ID
+          in: header
+          description: Unique request identifier
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: A list of pets
+          headers:
+            X-Rate-Limit-Remaining:
+              description: Number of requests remaining
+              schema:
+                type: integer
+            X-Total-Count:
+              description: Total number of pets
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Pet"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+              examples:
+                multiplePets:
+                  summary: Multiple pets
+                  value:
+                    items:
+                      - id: 1
+                        name: Buddy
+                        status: available
+                        category:
+                          id: 1
+                          name: Dogs
+                      - id: 2
+                        name: Whiskers
+                        status: pending
+                        category:
+                          id: 2
+                          name: Cats
+                    pagination:
+                      total: 2
+                      limit: 20
+                      offset: 0
+          links:
+            GetPetById:
+              operationId: getPetById
+              parameters:
+                petId: "$response.body#/items/0/id"
+              description: Get details of the first pet in the list
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags:
+        - pets
+      summary: Create a new pet
+      description: Add a new pet to the store
+      operationId: createPet
+      x-codegen-request-body-name: pet
+      requestBody:
+        description: Pet object to add to the store
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PetInput"
+            examples:
+              newDog:
+                summary: New dog example
+                value:
+                  name: Max
+                  status: available
+                  category:
+                    id: 1
+                    name: Dogs
+                  tags:
+                    - id: 1
+                      name: friendly
+      responses:
+        "201":
+          description: Pet created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+          links:
+            GetCreatedPet:
+              operationId: getPetById
+              parameters:
+                petId: "$response.body#/id"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+      callbacks:
+        petStatusUpdate:
+          "{$request.body#/webhookUrl}":
+            post:
+              summary: Pet status update webhook
+              description: Called when pet status changes
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      properties:
+                        petId:
+                          type: integer
+                          format: int64
+                        oldStatus:
+                          type: string
+                        newStatus:
+                          type: string
+                        timestamp:
+                          type: string
+                          format: date-time
+              responses:
+                "200":
+                  description: Webhook processed successfully
+
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        description: ID of the pet
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 123
+
+    get:
+      tags:
+        - pets
+      summary: Get a pet by ID
+      operationId: getPetById
+      responses:
+        "200":
+          description: Pet details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+              example:
+                id: 123
+                name: Buddy
+                status: available
+                category:
+                  id: 1
+                  name: Dogs
+          links:
+            UpdatePet:
+              operationId: updatePet
+              parameters:
+                petId: "$response.body#/id"
+            DeletePet:
+              operationId: deletePet
+              parameters:
+                petId: "$response.body#/id"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags:
+        - pets
+      summary: Update a pet
+      operationId: updatePet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PetInput"
+      responses:
+        "200":
+          description: Pet updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      tags:
+        - pets
+      summary: Partially update a pet
+      operationId: patchPet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PetPatch"
+      responses:
+        "200":
+          description: Pet patched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags:
+        - pets
+      summary: Delete a pet
+      operationId: deletePet
+      deprecated: true
+      x-deprecation-reason: Use POST /pets/{petId}/archive instead
+      responses:
+        "204":
+          description: Pet deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /pets/{petId}/medical-records:
+    get:
+      tags:
+        - pets
+      summary: Get pet medical records
+      operationId: getPetMedicalRecords
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Medical records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicalHistory"
+
+  /store/orders:
+    get:
+      tags:
+        - store
+      summary: List all orders
+      operationId: listOrders
+      security:
+        - OAuth2:
+            - read:orders
+      responses:
+        "200":
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+
+    post:
+      tags:
+        - store
+      summary: Place an order
+      operationId: placeOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Order placed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+          links:
+            GetOrder:
+              operationId: getOrderById
+              parameters:
+                orderId: "$response.body#/id"
+            GetOrderPet:
+              operationId: getPetById
+              parameters:
+                petId: "$response.body#/petId"
+
+  /store/orders/{orderId}:
+    get:
+      tags:
+        - store
+      summary: Get order by ID
+      operationId: getOrderById
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /users:
+    post:
+      tags:
+        - users
+      summary: Create a user
+      operationId: createUser
+      x-internal: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{username}:
+    get:
+      tags:
+        - users
+      summary: Get user by username
+      operationId: getUserByUsername
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  schemas:
+    Pet:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          example: 123
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Buddy
+        status:
+          type: string
+          enum:
+            - available
+            - pending
+            - sold
+          default: available
+        category:
+          $ref: "#/components/schemas/Category"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+        photoUrls:
+          type: array
+          items:
+            type: string
+            format: uri
+          nullable: true
+        metadata:
+          $ref: "#/components/schemas/PetMetadata"
+      example:
+        id: 1
+        name: Buddy
+        status: available
+        category:
+          id: 1
+          name: Dogs
+
+    PetInput:
+      allOf:
+        - $ref: "#/components/schemas/Pet"
+        - type: object
+          properties:
+            webhookUrl:
+              type: string
+              format: uri
+              description: URL for status update callbacks
+
+    PetPatch:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+            - available
+            - pending
+            - sold
+          nullable: true
+
+    PetMetadata:
+      type: object
+      description: Deeply nested pet metadata
+      properties:
+        health:
+          type: object
+          properties:
+            vaccinated:
+              type: boolean
+            lastCheckup:
+              type: string
+              format: date
+            veterinarian:
+              type: object
+              properties:
+                name:
+                  type: string
+                clinic:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    address:
+                      type: object
+                      properties:
+                        street:
+                          type: string
+                        city:
+                          type: string
+                        zipCode:
+                          type: string
+                        country:
+                          type: string
+        behavior:
+          type: object
+          properties:
+            trained:
+              type: boolean
+            traits:
+              type: array
+              items:
+                type: string
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          deprecated: true
+          x-deprecation-message: Use 'displayName' instead
+        displayName:
+          type: string
+
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    Animal:
+      type: object
+      discriminator:
+        propertyName: animalType
+        mapping:
+          dog: "#/components/schemas/Dog"
+          cat: "#/components/schemas/Cat"
+          bird: "#/components/schemas/Bird"
+      required:
+        - animalType
+        - name
+      properties:
+        animalType:
+          type: string
+        name:
+          type: string
+        age:
+          type: integer
+
+    Dog:
+      allOf:
+        - $ref: "#/components/schemas/Animal"
+        - type: object
+          properties:
+            breed:
+              type: string
+            barkVolume:
+              type: string
+              enum:
+                - quiet
+                - normal
+                - loud
+
+    Cat:
+      allOf:
+        - $ref: "#/components/schemas/Animal"
+        - type: object
+          properties:
+            breed:
+              type: string
+            indoor:
+              type: boolean
+
+    Bird:
+      allOf:
+        - $ref: "#/components/schemas/Animal"
+        - type: object
+          properties:
+            species:
+              type: string
+            canFly:
+              type: boolean
+
+    Payment:
+      oneOf:
+        - $ref: "#/components/schemas/CreditCardPayment"
+        - $ref: "#/components/schemas/BankTransferPayment"
+        - $ref: "#/components/schemas/CryptoPayment"
+      discriminator:
+        propertyName: type
+        mapping:
+          credit_card: "#/components/schemas/CreditCardPayment"
+          bank_transfer: "#/components/schemas/BankTransferPayment"
+          crypto: "#/components/schemas/CryptoPayment"
+
+    CreditCardPayment:
+      type: object
+      required:
+        - type
+        - cardNumber
+      properties:
+        type:
+          type: string
+        cardNumber:
+          type: string
+          pattern: "^[0-9]{16}$"
+        expiryDate:
+          type: string
+          pattern: "^(0[1-9]|1[0-2])/[0-9]{2}$"
+
+    BankTransferPayment:
+      type: object
+      required:
+        - type
+        - accountNumber
+      properties:
+        type:
+          type: string
+        accountNumber:
+          type: string
+        routingNumber:
+          type: string
+
+    CryptoPayment:
+      type: object
+      required:
+        - type
+        - walletAddress
+      properties:
+        type:
+          type: string
+        walletAddress:
+          type: string
+        currency:
+          type: string
+          enum:
+            - BTC
+            - ETH
+            - USDC
+
+    Notification:
+      anyOf:
+        - $ref: "#/components/schemas/EmailNotification"
+        - $ref: "#/components/schemas/SMSNotification"
+        - $ref: "#/components/schemas/PushNotification"
+
+    EmailNotification:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        subject:
+          type: string
+
+    SMSNotification:
+      type: object
+      properties:
+        phoneNumber:
+          type: string
+        message:
+          type: string
+          maxLength: 160
+
+    PushNotification:
+      type: object
+      properties:
+        deviceToken:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+
+    MedicalHistory:
+      type: object
+      properties:
+        petId:
+          type: integer
+          format: int64
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              type:
+                type: string
+                enum:
+                  - vaccination
+                  - checkup
+                  - surgery
+                  - medication
+              description:
+                type: string
+              veterinarian:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+              attachments:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    filename:
+                      type: string
+                    url:
+                      type: string
+                      format: uri
+                    mimeType:
+                      type: string
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        petId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+        shipDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - placed
+            - approved
+            - delivered
+        complete:
+          type: boolean
+          default: false
+        payment:
+          $ref: "#/components/schemas/Payment"
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+
+    OrderInput:
+      type: object
+      required:
+        - petId
+      properties:
+        petId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+          format: int32
+          default: 1
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        userStatus:
+          type: integer
+          format: int32
+          description: User status (0=inactive, 1=active, 2=suspended)
+
+    UserInput:
+      type: object
+      required:
+        - username
+        - email
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+          writeOnly: true
+        phone:
+          type: string
+          nullable: true
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              issue:
+                type: string
+        requestId:
+          type: string
+          format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: BAD_REQUEST
+            message: Invalid request parameters
+            details:
+              - field: limit
+                issue: Must be between 1 and 100
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: UNAUTHORIZED
+            message: Authentication required
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            code: NOT_FOUND
+            message: The requested resource was not found
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+    OAuth2:
+      type: oauth2
+      description: OAuth2 authentication
+      flows:
+        authorizationCode:
+          authorizationUrl: https://petstore.example.com/oauth/authorize
+          tokenUrl: https://petstore.example.com/oauth/token
+          refreshUrl: https://petstore.example.com/oauth/refresh
+          scopes:
+            read:pets: Read access to pets
+            write:pets: Write access to pets
+            read:orders: Read access to orders
+            write:orders: Write access to orders
+            admin: Full administrative access
+        clientCredentials:
+          tokenUrl: https://petstore.example.com/oauth/token
+          scopes:
+            read:pets: Read access to pets
+            write:pets: Write access to pets
+
+  callbacks:
+    OrderStatusWebhook:
+      "{$request.body#/callbackUrl}":
+        post:
+          summary: Order status change notification
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    orderId:
+                      type: integer
+                      format: int64
+                    status:
+                      type: string
+                    timestamp:
+                      type: string
+                      format: date-time
+          responses:
+            "200":
+              description: Callback processed

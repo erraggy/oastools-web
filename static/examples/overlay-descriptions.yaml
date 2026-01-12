@@ -1,0 +1,14 @@
+overlay: "1.0.0"
+info:
+  title: Add Descriptions
+  version: "1.0.0"
+actions:
+  - target: $.paths['/pets'].get
+    update:
+      description: Returns all pets from the system that the user has access to. Supports pagination via the limit parameter.
+  - target: $.paths['/pets'].post
+    update:
+      description: Creates a new pet in the store. Duplicates are allowed.
+  - target: $.paths['/pets/{petId}'].get
+    update:
+      description: Returns a pet based on a single ID. Returns 404 if the pet does not exist.

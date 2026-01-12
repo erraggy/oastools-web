@@ -66,6 +66,18 @@ Analyze spec structure — endpoints, schemas, dependencies. Understand unfamili
 
 ![Explore analysis view](static/img/screen-explore-full.png)
 
+### Example Specifications
+
+Each page includes a "Load Example" dropdown with curated sample specifications:
+
+- **Validate**: Clean spec, spec with warnings, spec with errors
+- **Convert**: Petstore 2.0 and 3.0 for version conversion
+- **Diff**: Three versions to compare (v1 base, v2 safe changes, v3 breaking changes)
+- **Fix**: Messy spec with auto-fixable issues
+- **Join**: Four microservice specs (Users, Products, Orders, Inventory)
+- **Overlay**: Base spec with three overlay examples
+- **Explore**: Full-featured Petstore with all OpenAPI features
+
 ## For Go Developers
 
 This web app is built with oastools' `builder.ServerBuilder` — the same toolkit you can use in your own projects. See the [library documentation](https://erraggy.github.io/oastools) to get started.

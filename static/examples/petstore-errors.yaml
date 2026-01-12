@@ -1,0 +1,199 @@
+openapi: "3.0.3"
+info:
+  title: Petstore API (Errors Example)
+  description: A sample API demonstrating structural and semantic errors that fail validation.
+  # ERROR: Missing required field 'version'
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://petstore.example.com/api/v1
+    description: Production server
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List all pets
+      description: Returns all pets from the system that the user has access to.
+      tags:
+        - pets
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of pets to return
+          required: false
+          schema:
+            type: integer
+            format: int32
+            maximum: 100
+      responses:
+        "200":
+          description: A list of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pet"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: createPet
+      summary: Create a pet
+      description: Creates a new pet in the store.
+      tags:
+        - pets
+      requestBody:
+        description: Pet to add to the store
+        required: true
+        content:
+          application/json:
+            schema:
+              # ERROR: Broken $ref - schema does not exist
+              $ref: "#/components/schemas/NonExistent"
+      responses:
+        "201":
+          description: Pet created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /pets/{petId}:
+    get:
+      operationId: getPetById
+      summary: Get a pet by ID
+      description: Returns a pet based on a single ID.
+      tags:
+        - pets
+      parameters:
+        - name: petId
+          in: path
+          description: ID of pet to fetch
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Pet details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      # ERROR: Duplicate operationId (same as GET /pets/{petId})
+      operationId: getPetById
+      summary: Delete a pet
+      description: Deletes a pet from the store.
+      tags:
+        - pets
+      parameters:
+        - name: petId
+          in: path
+          description: ID of pet to delete
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Pet deleted successfully
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /pets/{petId}/photos/{photoId}:
+    get:
+      operationId: getPetPhoto
+      summary: Get a pet photo
+      description: Returns a specific photo for a pet.
+      tags:
+        - pets
+      parameters:
+        # ERROR: Path declares {petId} and {photoId} but only petId is defined
+        - name: petId
+          in: path
+          description: ID of pet
+          required: true
+          schema:
+            type: integer
+            format: int64
+        # Missing: photoId parameter declaration
+      responses:
+        "200":
+          description: Photo details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Photo"
+  /stores:
+    get:
+      operationId: listStores
+      summary: List all stores
+      description: Returns all stores.
+      tags:
+        - stores
+      # ERROR: Missing required 'responses' object
+components:
+  schemas:
+    Pet:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier for the pet
+        name:
+          type: string
+          description: Name of the pet
+        tag:
+          type: string
+          description: Optional tag for the pet
+    Photo:
+      type: object
+      required:
+        - id
+        - url
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier for the photo
+        url:
+          type: string
+          format: uri
+          description: URL of the photo
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Error code
+        message:
+          type: string
+          description: Error message
