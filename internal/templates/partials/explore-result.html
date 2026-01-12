@@ -345,9 +345,7 @@
 <div class="inline-schemas-section">
     <div class="inline-header">
         <span>Inline Schemas: {{len .InlineSchemas}}</span>
-        <button type="button" class="inline-collapse-btn" onclick="this.closest('.inline-schemas-section').remove()">
-            Hide
-        </button>
+        <button type="button" class="inline-collapse-btn">Hide</button>
     </div>
     <div class="inline-list">
         {{range .InlineSchemas}}
@@ -558,9 +556,7 @@
 <div class="unsecured-section">
     <div class="unsecured-header">
         <span>Unsecured Operations: {{len .UnsecuredOps}}</span>
-        <button type="button" class="unsecured-collapse-btn" onclick="this.closest('.unsecured-section').remove()">
-            Hide
-        </button>
+        <button type="button" class="unsecured-collapse-btn">Hide</button>
     </div>
     {{if .UnsecuredOps}}
     <div class="unsecured-list">

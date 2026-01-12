@@ -267,6 +267,7 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 // Stop performs cleanup for graceful shutdown.
 func (h *Handler) Stop() {
 	h.rateLimiter.Stop()
+	exploreCache.Stop()
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -7,7 +7,7 @@ import (
 )
 
 func TestTTLCache_SetGet(t *testing.T) {
-	cache := NewTTLCache[string, int](1 * time.Minute)
+	cache := NewTTLCache[string, int](1*time.Minute, 0)
 	defer cache.Stop()
 
 	cache.Set("key1", 100)
@@ -30,7 +30,7 @@ func TestTTLCache_SetGet(t *testing.T) {
 }
 
 func TestTTLCache_Expiration(t *testing.T) {
-	cache := NewTTLCache[string, string](50 * time.Millisecond)
+	cache := NewTTLCache[string, string](50*time.Millisecond, 0)
 	defer cache.Stop()
 
 	cache.Set("key", "value")
@@ -49,7 +49,7 @@ func TestTTLCache_Expiration(t *testing.T) {
 }
 
 func TestTTLCache_Delete(t *testing.T) {
-	cache := NewTTLCache[string, int](1 * time.Minute)
+	cache := NewTTLCache[string, int](1*time.Minute, 0)
 	defer cache.Stop()
 
 	cache.Set("key", 42)
@@ -62,7 +62,7 @@ func TestTTLCache_Delete(t *testing.T) {
 }
 
 func TestTTLCache_Concurrent(t *testing.T) {
-	cache := NewTTLCache[int, int](1 * time.Minute)
+	cache := NewTTLCache[int, int](1*time.Minute, 0)
 	defer cache.Stop()
 
 	var wg sync.WaitGroup
@@ -85,5 +85,44 @@ func TestTTLCache_Concurrent(t *testing.T) {
 		if val != i*2 {
 			t.Errorf("Get(%d) = %d; want %d", i, val, i*2)
 		}
+	}
+}
+
+func TestTTLCache_MaxEntries(t *testing.T) {
+	cache := NewTTLCache[string, int](1*time.Minute, 3)
+	defer cache.Stop()
+
+	// Add entries with small delays to ensure ordering
+	cache.Set("a", 1)
+	time.Sleep(1 * time.Millisecond)
+	cache.Set("b", 2)
+	time.Sleep(1 * time.Millisecond)
+	cache.Set("c", 3)
+
+	// All three should be present
+	if _, ok := cache.Get("a"); !ok {
+		t.Error("Get(a) should return true")
+	}
+	if _, ok := cache.Get("b"); !ok {
+		t.Error("Get(b) should return true")
+	}
+	if _, ok := cache.Get("c"); !ok {
+		t.Error("Get(c) should return true")
+	}
+
+	// Add a fourth - oldest (a) should be evicted
+	cache.Set("d", 4)
+
+	if _, ok := cache.Get("a"); ok {
+		t.Error("Get(a) should return false after eviction")
+	}
+	if _, ok := cache.Get("b"); !ok {
+		t.Error("Get(b) should return true")
+	}
+	if _, ok := cache.Get("c"); !ok {
+		t.Error("Get(c) should return true")
+	}
+	if _, ok := cache.Get("d"); !ok {
+		t.Error("Get(d) should return true")
 	}
 }

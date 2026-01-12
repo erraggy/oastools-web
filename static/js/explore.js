@@ -174,6 +174,21 @@
         }
     });
 
+    // Collapse buttons for inline schemas and unsecured operations
+    document.addEventListener('click', function(evt) {
+        if (evt.target.matches('.inline-collapse-btn')) {
+            const section = evt.target.closest('.inline-schemas-section');
+            if (section) {
+                section.remove();
+            }
+        } else if (evt.target.matches('.unsecured-collapse-btn')) {
+            const section = evt.target.closest('.unsecured-section');
+            if (section) {
+                section.remove();
+            }
+        }
+    });
+
     // Resubmit spec after cache miss
     function resubmitSpec(storedData, target, originalConfig) {
         const formData = new FormData();

@@ -2117,6 +2117,6 @@ func TestGetVersionString_WithParsedSpec(t *testing.T) {
 
 // Ensure cache is cleaned up between tests
 func init() {
-	// Use a short TTL for testing
-	exploreCache = NewTTLCache[string, *ExploreAnalysis](2 * time.Minute)
+	// Use a short TTL for testing with no entry limit
+	exploreCache = NewTTLCache[string, *ExploreAnalysis](2*time.Minute, 0)
 }
