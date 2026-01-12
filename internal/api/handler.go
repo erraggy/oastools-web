@@ -19,6 +19,9 @@ import (
 	"github.com/erraggy/oastools/parser"
 )
 
+// jsonNullType is the JSON schema null type string used in OAS 3.1+ type arrays.
+const jsonNullType = "null"
+
 // Handler is the main HTTP handler for the application.
 type Handler struct {
 	cfg             *config.Config
@@ -75,12 +78,12 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 			case []any:
 				var types []string
 				for _, item := range v {
-					if s, ok := item.(string); ok && s != "null" {
+					if s, ok := item.(string); ok && s != jsonNullType {
 						types = append(types, s)
 					}
 				}
 				if len(types) == 0 {
-					return "null"
+					return jsonNullType
 				}
 				if len(types) == 1 {
 					return types[0]

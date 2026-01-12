@@ -501,6 +501,453 @@ func TestExploreCache_Integration(t *testing.T) {
 	}
 }
 
+// validOpenAPI30WithInlineSchemas is an OpenAPI spec with inline schemas for testing.
+const validOpenAPI30WithInlineSchemas = `openapi: "3.0.0"
+info:
+  title: Test API
+  version: "1.0.0"
+paths:
+  /pets:
+    post:
+      summary: Create a pet
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: A pet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+        "400":
+          description: Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+  /items:
+    get:
+      summary: List items
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+      responses:
+        "200":
+          description: Items list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+`
+
+// inlineSchemaTestHandler creates a handler for inline schema tests.
+func inlineSchemaTestHandler(t *testing.T) *Handler {
+	t.Helper()
+
+	partials, err := template.New("partials").Parse(`
+{{define "error"}}Error: {{.Message}}{{end}}
+{{define "explore_inline_schemas"}}
+<div class="inline-schemas-section">
+    <div class="inline-header">
+        <span>Inline Schemas: {{len .InlineSchemas}}</span>
+    </div>
+    <div class="inline-list">
+        {{range .InlineSchemas}}
+        <div class="inline-row">
+            <span class="method-badge">{{.Method}}</span>
+            <span class="inline-path">{{.PathTemplate}}</span>
+            <span class="inline-context">({{.Context}})</span>
+            <span class="type-badge">{{.Type}}</span>
+        </div>
+        {{end}}
+    </div>
+    {{if gt (len .InlineSchemas) 10}}
+    <div class="inline-warning">Warning</div>
+    {{end}}
+</div>
+{{end}}
+`)
+	if err != nil {
+		t.Fatalf("failed to create test partials: %v", err)
+	}
+
+	return &Handler{
+		cfg: &config.Config{
+			MaxFileSize: 2 << 20,
+		},
+		partials:        partials,
+		version:         "test-version",
+		oastoolsVersion: "test-oastools-version",
+	}
+}
+
+// setupInlineSchemaTestAnalysis creates and caches an analysis with inline schemas.
+func setupInlineSchemaTestAnalysis(t *testing.T, hash string) {
+	t.Helper()
+
+	parseResult, err := parser.ParseWithOptions(parser.WithBytes([]byte(validOpenAPI30WithInlineSchemas)))
+	if err != nil {
+		t.Fatalf("failed to parse test spec: %v", err)
+	}
+
+	operations, err := walker.CollectOperations(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect operations: %v", err)
+	}
+
+	schemas, err := walker.CollectSchemas(parseResult)
+	if err != nil {
+		t.Fatalf("failed to collect schemas: %v", err)
+	}
+
+	analysis := &ExploreAnalysis{
+		Hash:        hash,
+		Version:     "3.0.0",
+		Filename:    "test.yaml",
+		ParseResult: parseResult,
+		Operations:  operations,
+		Schemas:     schemas,
+		Stats: ExploreStats{
+			PathCount:      2,
+			OperationCount: 2,
+			InlineCount:    len(schemas.Inline),
+		},
+	}
+
+	exploreCache.Set(hash, analysis)
+}
+
+func TestHandler_handleExploreInlineSchemas(t *testing.T) {
+	tests := []struct {
+		name           string
+		queryParams    string
+		setupHash      string
+		wantStatus     int
+		wantContains   []string
+		wantCacheEvent bool
+	}{
+		{
+			name:         "missing hash parameter",
+			queryParams:  "",
+			wantStatus:   http.StatusBadRequest,
+			wantContains: []string{"Missing hash parameter"},
+		},
+		{
+			name:           "cache miss returns 410 Gone",
+			queryParams:    "h=nonexistent",
+			wantStatus:     http.StatusGone,
+			wantCacheEvent: true,
+		},
+		{
+			name:        "successful inline schemas render",
+			queryParams: "h=inlinehash1",
+			setupHash:   "inlinehash1",
+			wantStatus:  http.StatusOK,
+			wantContains: []string{
+				"inline-schemas-section",
+				"Inline Schemas:",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := inlineSchemaTestHandler(t)
+
+			// Setup cache if needed
+			if tt.setupHash != "" {
+				setupInlineSchemaTestAnalysis(t, tt.setupHash)
+				t.Cleanup(func() {
+					exploreCache.Delete(tt.setupHash)
+				})
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/explore/inline-schemas?"+tt.queryParams, nil)
+			resp := h.handleExploreInlineSchemas(context.Background(), &builder.Request{HTTPRequest: req})
+
+			if resp.StatusCode() != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode(), tt.wantStatus)
+			}
+
+			// Check for cache expired response
+			if tt.wantCacheEvent {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				if rec.Header().Get("HX-Trigger") != "cacheExpired" {
+					t.Errorf("expected HX-Trigger=cacheExpired header")
+				}
+				return
+			}
+
+			// Check response body contains expected content
+			if len(tt.wantContains) > 0 {
+				rec := httptest.NewRecorder()
+				if err := resp.WriteTo(rec); err != nil {
+					t.Fatalf("WriteTo failed: %v", err)
+				}
+				body := rec.Body.String()
+				for _, want := range tt.wantContains {
+					if !strings.Contains(body, want) {
+						t.Errorf("body = %q, want contains %q", body, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestParseInlineLocations(t *testing.T) {
+	tests := []struct {
+		name     string
+		jsonPath string
+		want     InlineSchemaLocation
+	}{
+		{
+			name:     "request body schema",
+			jsonPath: "$.paths['/pets'].post.requestBody.content['application/json'].schema",
+			want: InlineSchemaLocation{
+				Method:       "post",
+				PathTemplate: "/pets",
+				Context:      "request body",
+			},
+		},
+		{
+			name:     "response 200 schema",
+			jsonPath: "$.paths['/pets'].get.responses['200'].content['application/json'].schema",
+			want: InlineSchemaLocation{
+				Method:       "get",
+				PathTemplate: "/pets",
+				Context:      "response 200",
+			},
+		},
+		{
+			name:     "response default schema",
+			jsonPath: "$.paths['/pets'].get.responses.default.content['application/json'].schema",
+			want: InlineSchemaLocation{
+				Method:       "get",
+				PathTemplate: "/pets",
+				Context:      "response default",
+			},
+		},
+		{
+			name:     "parameter schema",
+			jsonPath: "$.paths['/items'].get.parameters[0].schema",
+			want: InlineSchemaLocation{
+				Method:       "get",
+				PathTemplate: "/items",
+				Context:      "parameter",
+			},
+		},
+		{
+			name:     "path with special characters",
+			jsonPath: "$.paths['/pets/{petId}'].put.requestBody.content['application/json'].schema",
+			want: InlineSchemaLocation{
+				Method:       "put",
+				PathTemplate: "/pets/{petId}",
+				Context:      "request body",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock analysis with a single inline schema
+			analysis := &ExploreAnalysis{
+				Schemas: &walker.SchemaCollector{
+					Inline: []*walker.SchemaInfo{
+						{JSONPath: tt.jsonPath, Schema: &parser.Schema{}},
+					},
+				},
+			}
+
+			locations := parseInlineLocations(analysis)
+			if len(locations) != 1 {
+				t.Fatalf("got %d locations, want 1", len(locations))
+			}
+
+			got := locations[0]
+			if got.Method != tt.want.Method {
+				t.Errorf("Method = %q, want %q", got.Method, tt.want.Method)
+			}
+			if got.PathTemplate != tt.want.PathTemplate {
+				t.Errorf("PathTemplate = %q, want %q", got.PathTemplate, tt.want.PathTemplate)
+			}
+			if got.Context != tt.want.Context {
+				t.Errorf("Context = %q, want %q", got.Context, tt.want.Context)
+			}
+		})
+	}
+}
+
+func TestParseInlineLocations_NilCases(t *testing.T) {
+	// Test nil analysis
+	if got := parseInlineLocations(nil); got != nil {
+		t.Errorf("parseInlineLocations(nil) = %v, want nil", got)
+	}
+
+	// Test nil schemas
+	analysis := &ExploreAnalysis{Schemas: nil}
+	if got := parseInlineLocations(analysis); got != nil {
+		t.Errorf("parseInlineLocations(nil schemas) = %v, want nil", got)
+	}
+
+	// Test empty inline schemas
+	analysis = &ExploreAnalysis{
+		Schemas: &walker.SchemaCollector{
+			Inline: []*walker.SchemaInfo{},
+		},
+	}
+	got := parseInlineLocations(analysis)
+	if len(got) != 0 {
+		t.Errorf("parseInlineLocations(empty) = %v, want empty slice", got)
+	}
+}
+
+func TestGetSchemaType(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *parser.Schema
+		want   string
+	}{
+		{
+			name:   "nil schema",
+			schema: nil,
+			want:   "",
+		},
+		{
+			name:   "enum schema",
+			schema: &parser.Schema{Enum: []any{"a", "b", "c"}},
+			want:   "[enum]",
+		},
+		{
+			name:   "array schema",
+			schema: &parser.Schema{Type: "array"},
+			want:   "[array]",
+		},
+		{
+			name:   "object with properties",
+			schema: &parser.Schema{Properties: map[string]*parser.Schema{"id": {}}},
+			want:   "{object}",
+		},
+		{
+			name:   "allOf schema",
+			schema: &parser.Schema{AllOf: []*parser.Schema{{}, {}}},
+			want:   "{allOf}",
+		},
+		{
+			name:   "oneOf schema",
+			schema: &parser.Schema{OneOf: []*parser.Schema{{}, {}}},
+			want:   "{oneOf}",
+		},
+		{
+			name:   "anyOf schema",
+			schema: &parser.Schema{AnyOf: []*parser.Schema{{}, {}}},
+			want:   "{anyOf}",
+		},
+		{
+			name:   "string type",
+			schema: &parser.Schema{Type: "string"},
+			want:   "string",
+		},
+		{
+			name:   "integer type",
+			schema: &parser.Schema{Type: "integer"},
+			want:   "integer",
+		},
+		{
+			name:   "OAS 3.1 nullable type array",
+			schema: &parser.Schema{Type: []any{"string", "null"}},
+			want:   "string",
+		},
+		{
+			name:   "OAS 3.1 null-only type",
+			schema: &parser.Schema{Type: []any{"null"}},
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getSchemaType(tt.schema)
+			if got != tt.want {
+				t.Errorf("getSchemaType() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatTypeString(t *testing.T) {
+	tests := []struct {
+		name  string
+		input any
+		want  string
+	}{
+		{
+			name:  "string type",
+			input: "string",
+			want:  "string",
+		},
+		{
+			name:  "array with non-null type",
+			input: []any{"string", "null"},
+			want:  "string",
+		},
+		{
+			name:  "array with null first",
+			input: []any{"null", "integer"},
+			want:  "integer",
+		},
+		{
+			name:  "array with only null",
+			input: []any{"null"},
+			want:  "",
+		},
+		{
+			name:  "nil input",
+			input: nil,
+			want:  "",
+		},
+		{
+			name:  "unexpected type",
+			input: 123,
+			want:  "",
+		},
+		{
+			name:  "empty array",
+			input: []any{},
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatTypeString(tt.input)
+			if got != tt.want {
+				t.Errorf("formatTypeString() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // Ensure cache is cleaned up between tests
 func init() {
 	// Use a short TTL for testing

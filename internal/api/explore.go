@@ -539,6 +539,144 @@ func (h *Handler) handleExploreSchemaDetail(_ context.Context, req *builder.Requ
 	return h.renderHTML("explore_schema_detail", data)
 }
 
+// InlineSchemaLocation represents where an inline schema appears.
+type InlineSchemaLocation struct {
+	Method       string
+	PathTemplate string
+	Context      string
+	Type         string
+}
+
+// handleExploreInlineSchemas renders the inline schemas drill-in partial.
+func (h *Handler) handleExploreInlineSchemas(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+	hash := r.URL.Query().Get("h")
+	if hash == "" {
+		return builder.Error(http.StatusBadRequest, "Missing hash parameter")
+	}
+
+	analysis, ok := exploreCache.Get(hash)
+	if !ok {
+		return &cacheExpiredResponse{}
+	}
+
+	locations := parseInlineLocations(analysis)
+
+	return h.renderHTML("explore_inline_schemas", map[string]any{
+		"InlineSchemas": locations,
+	})
+}
+
+// parseInlineLocations parses JSON paths from inline schemas to extract location details.
+// JSON path format: $.paths['/pets'].post.requestBody.content['application/json'].schema
+func parseInlineLocations(analysis *ExploreAnalysis) []InlineSchemaLocation {
+	if analysis == nil || analysis.Schemas == nil {
+		return nil
+	}
+
+	var locations []InlineSchemaLocation
+	for _, schemaInfo := range analysis.Schemas.Inline {
+		loc := InlineSchemaLocation{
+			Type: getSchemaType(schemaInfo.Schema),
+		}
+
+		jsonPath := schemaInfo.JSONPath
+
+		// Extract path template from $.paths['/pets']
+		if idx := strings.Index(jsonPath, "$.paths['"); idx != -1 {
+			start := idx + len("$.paths['")
+			end := strings.Index(jsonPath[start:], "']")
+			if end != -1 {
+				loc.PathTemplate = jsonPath[start : start+end]
+			}
+		}
+
+		// Extract method (get, post, put, patch, delete)
+		remaining := jsonPath
+		if loc.PathTemplate != "" {
+			remaining = jsonPath[strings.Index(jsonPath, "'].")+3:]
+		}
+		methods := []string{"get", "post", "put", "patch", "delete", "options", "head", "trace"}
+		for _, m := range methods {
+			if strings.HasPrefix(remaining, m+".") || strings.HasPrefix(remaining, m+"[") || remaining == m {
+				loc.Method = m
+				remaining = strings.TrimPrefix(remaining, m)
+				remaining = strings.TrimPrefix(remaining, ".")
+				break
+			}
+		}
+
+		// Extract context from requestBody/responses/parameters
+		switch {
+		case strings.Contains(remaining, "requestBody"):
+			loc.Context = "request body"
+		case strings.Contains(remaining, "responses"):
+			// Try to extract status code
+			if idx := strings.Index(remaining, "responses['"); idx != -1 {
+				start := idx + len("responses['")
+				end := strings.Index(remaining[start:], "']")
+				if end != -1 {
+					loc.Context = "response " + remaining[start:start+end]
+				}
+			} else if strings.Contains(remaining, "responses.default") {
+				loc.Context = "response default"
+			} else {
+				loc.Context = "response"
+			}
+		case strings.Contains(remaining, "parameters"):
+			loc.Context = "parameter"
+		default:
+			loc.Context = "schema"
+		}
+
+		locations = append(locations, loc)
+	}
+
+	return locations
+}
+
+// getSchemaType returns a human-readable type badge for a schema.
+func getSchemaType(s *parser.Schema) string {
+	if s == nil {
+		return ""
+	}
+	if s.Enum != nil {
+		return "[enum]"
+	}
+	t := formatTypeString(s.Type)
+	if t == "array" {
+		return "[array]"
+	}
+	if s.Properties != nil {
+		return "{object}"
+	}
+	if s.AllOf != nil {
+		return "{allOf}"
+	}
+	if s.OneOf != nil {
+		return "{oneOf}"
+	}
+	if s.AnyOf != nil {
+		return "{anyOf}"
+	}
+	return t
+}
+
+// formatTypeString converts Type (string or []any) to string.
+func formatTypeString(t any) string {
+	switch v := t.(type) {
+	case string:
+		return v
+	case []any:
+		for _, item := range v {
+			if s, ok := item.(string); ok && s != jsonNullType {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
 // findSchemaUsages finds all operations that reference the given schema.
 func findSchemaUsages(analysis *ExploreAnalysis, schemaName string) []SchemaUsage {
 	var usages []SchemaUsage

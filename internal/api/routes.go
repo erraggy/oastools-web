@@ -320,4 +320,26 @@ func (h *Handler) registerOperations(srv *builder.ServerBuilder) {
 		),
 		builder.WithHandler(h.handleExploreSchemaDetail),
 	)
+
+	// GET /api/explore/inline-schemas - retrieve inline schema locations from cached analysis
+	srv.AddOperation(http.MethodGet, "/api/explore/inline-schemas",
+		builder.WithOperationID("exploreInlineSchemas"),
+		builder.WithSummary("Get inline schema locations from analyzed specification"),
+		builder.WithDescription("Returns the locations of all inline schemas from a previously analyzed specification."),
+		builder.WithTags("explore"),
+		builder.WithQueryParam("h", "string",
+			builder.WithParamDescription("Hash of the cached analysis"),
+			builder.WithParamRequired(true),
+		),
+		builder.WithResponse(http.StatusOK, nil,
+			builder.WithResponseDescription("Inline schema locations"),
+		),
+		builder.WithResponse(http.StatusBadRequest, ErrorResponse{},
+			builder.WithResponseDescription("Missing hash parameter"),
+		),
+		builder.WithResponse(http.StatusGone, nil,
+			builder.WithResponseDescription("Analysis cache expired"),
+		),
+		builder.WithHandler(h.handleExploreInlineSchemas),
+	)
 }

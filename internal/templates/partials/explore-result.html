@@ -272,6 +272,32 @@
 </div>
 {{end}}
 
+{{define "explore_inline_schemas"}}
+<div class="inline-schemas-section">
+    <div class="inline-header">
+        <span>Inline Schemas: {{len .InlineSchemas}}</span>
+        <button type="button" class="inline-collapse-btn" onclick="this.closest('.inline-schemas-section').remove()">
+            Hide
+        </button>
+    </div>
+    <div class="inline-list">
+        {{range .InlineSchemas}}
+        <div class="inline-row">
+            <span class="method-badge method-{{.Method}}">{{.Method}}</span>
+            <span class="inline-path">{{.PathTemplate}}</span>
+            <span class="inline-context">({{.Context}})</span>
+            <span class="type-badge">{{.Type}}</span>
+        </div>
+        {{end}}
+    </div>
+    {{if gt (len .InlineSchemas) 10}}
+    <div class="inline-warning">
+        Warning: High inline count may indicate opportunities for schema reuse
+    </div>
+    {{end}}
+</div>
+{{end}}
+
 {{define "explore_operation_detail"}}
 <div class="detail-card" id="op-{{.OperationID}}">
     <div class="detail-header">
