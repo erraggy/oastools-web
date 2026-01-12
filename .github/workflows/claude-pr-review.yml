@@ -61,7 +61,6 @@ jobs:
           claude_args: |
             --model=opus
             --allowed-tools "Bash(gh:*)"
-          show_full_output: true
 
       - name: Post review as PR comment
         if: always() && steps.claude.outputs.execution_file
