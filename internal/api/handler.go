@@ -47,7 +47,7 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 
 	// Parse each page template into a cloned base to avoid block collisions
 	pageTemplates := make(map[string]*template.Template)
-	pages := []string{"index.html", "validate.html", "convert.html", "diff.html", "fix.html", "join.html", "overlay.html"}
+	pages := []string{"index.html", "validate.html", "convert.html", "diff.html", "fix.html", "join.html", "overlay.html", "explore.html"}
 	for _, page := range pages {
 		// Clone base template so each page gets its own copy
 		clone, err := base.Clone()
@@ -174,6 +174,8 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 		templateName = "join.html"
 	case "/overlay":
 		templateName = "overlay.html"
+	case "/explore":
+		templateName = "explore.html"
 	default:
 		http.NotFound(w, r)
 		return
