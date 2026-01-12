@@ -207,8 +207,61 @@
 {{define "schema_items_type"}}{{if isSchema .}}{{if .Ref}}{{schemaName .Ref}}{{else}}{{formatType .Type}}{{end}}{{end}}{{end}}
 
 {{define "explore_security"}}
-<div class="security-list">
-    <p class="loading-message">Loading security schemes...</p>
+<div class="security-container">
+    <div class="security-header">
+        <span class="security-count">Security Schemes ({{len .Analysis.Security}})</span>
+        <span class="coverage">
+            Coverage: {{.Analysis.Stats.SecuredCount}}/{{.Analysis.Stats.OperationCount}}
+            {{if gt .Analysis.Stats.UnsecuredCount 0}}
+            <button type="button" class="unsecured-expand-btn"
+                    hx-get="/api/explore/unsecured?h={{.Analysis.Hash}}"
+                    hx-target="#unsecured-list"
+                    hx-swap="innerHTML">
+                Show unsecured
+            </button>
+            {{end}}
+        </span>
+    </div>
+
+    <div id="unsecured-list"></div>
+
+    {{if .Analysis.Security}}
+    <div class="security-list">
+        {{$hash := .Analysis.Hash}}
+        {{range .Analysis.Security}}
+        <div class="security-row"
+             hx-get="/api/explore/security-detail?h={{$hash}}&amp;name={{.Name | urlquery}}"
+             hx-target="#security-detail"
+             hx-swap="innerHTML">
+            <div class="security-main">
+                <span class="security-name">{{.Name}}</span>
+                <span class="security-type-badge">[{{.Type}}]</span>
+            </div>
+            <div class="security-config">
+                {{if eq .Type "apiKey"}}
+                {{.In}}: {{.ParamName}}
+                {{else if eq .Type "http"}}
+                scheme: {{.Scheme}}
+                {{else if eq .Type "oauth2"}}
+                {{range .Flows}}{{.Type}} flow{{if not (eq .Type "")}} {{end}}{{end}}
+                {{else if eq .Type "openIdConnect"}}
+                OpenID Connect
+                {{end}}
+            </div>
+            <div class="security-usage">
+                Used by {{.UsageCount}} operations
+            </div>
+            <span class="security-arrow">-></span>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="no-security">
+        No security schemes defined
+    </div>
+    {{end}}
+
+    <div id="security-detail"></div>
 </div>
 {{end}}
 
