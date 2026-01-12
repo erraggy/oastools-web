@@ -205,7 +205,7 @@ func extractSecuritySchemes(result *parser.ParseResult, operations *walker.Opera
 	usageCounts := countSecurityUsage(result, operations)
 
 	// Build security scheme info list
-	var securityInfos []SecuritySchemeInfo
+	securityInfos := make([]SecuritySchemeInfo, 0, len(schemes))
 	for name, scheme := range schemes {
 		if scheme == nil {
 			continue
@@ -601,7 +601,7 @@ func parseInlineLocations(analysis *ExploreAnalysis) []InlineSchemaLocation {
 		return nil
 	}
 
-	var locations []InlineSchemaLocation
+	locations := make([]InlineSchemaLocation, 0, len(analysis.Schemas.Inline))
 	for _, schemaInfo := range analysis.Schemas.Inline {
 		loc := InlineSchemaLocation{
 			Type: getSchemaType(schemaInfo.Schema),
