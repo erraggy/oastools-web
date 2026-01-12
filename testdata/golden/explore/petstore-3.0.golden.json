@@ -1,0 +1,29 @@
+{
+  "filename": "petstore-3.0.input.yaml",
+  "hash": "9db4a89eb2d0a745",
+  "security": [
+    {
+      "Flows": null,
+      "In": "header",
+      "Name": "api_key",
+      "OpenIDURL": "",
+      "ParamName": "api_key",
+      "Scheme": "",
+      "Type": "apiKey",
+      "UsageCount": 0
+    }
+  ],
+  "stats": {
+    "InlineCount": 9,
+    "MethodCounts": {
+      "GET": 2,
+      "POST": 1
+    },
+    "OperationCount": 3,
+    "PathCount": 2,
+    "SchemaCount": 11,
+    "SecuredCount": 0,
+    "UnsecuredCount": 3
+  },
+  "version": "3.0.3"
+}

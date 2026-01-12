@@ -82,6 +82,25 @@ func TestGoldenConvert(t *testing.T) {
 	runGoldenTests(t, tests)
 }
 
+func TestGoldenExplore(t *testing.T) {
+	tests := []goldenTest{
+		{
+			name:       "petstore-3.0",
+			endpoint:   "/api/explore",
+			inputFiles: map[string]string{"spec": "testdata/golden/explore/petstore-3.0.input.yaml"},
+			goldenFile: "testdata/golden/explore/petstore-3.0.golden.json",
+		},
+		{
+			name:       "petstore-2.0",
+			endpoint:   "/api/explore",
+			inputFiles: map[string]string{"spec": "testdata/golden/explore/petstore-2.0.input.yaml"},
+			goldenFile: "testdata/golden/explore/petstore-2.0.golden.json",
+		},
+	}
+
+	runGoldenTests(t, tests)
+}
+
 func runGoldenTests(t *testing.T, tests []goldenTest) {
 	// Change to repo root for testdata paths
 	if err := os.Chdir(findRepoRoot(t)); err != nil {
