@@ -1,0 +1,112 @@
+openapi: 3.0.3
+info:
+  title: Inventory API
+  description: Inventory management microservice (has intentional conflicts with Products API)
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/v1
+paths:
+  # CONFLICT: Same path as Products API
+  /products:
+    get:
+      summary: List products with stock levels
+      operationId: listProductsWithStock
+      tags:
+        - inventory
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+  /inventory:
+    get:
+      summary: Get full inventory report
+      operationId: getInventoryReport
+      tags:
+        - inventory
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StockLevel'
+  /inventory/{productId}/stock:
+    post:
+      summary: Update stock level for a product
+      operationId: updateStock
+      tags:
+        - inventory
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockUpdate'
+      responses:
+        '200':
+          description: Stock updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLevel'
+components:
+  schemas:
+    # CONFLICT: Same schema name as Products API but different structure
+    Product:
+      type: object
+      required:
+        - id
+        - sku
+      properties:
+        id:
+          type: string
+          description: Unique product identifier
+        sku:
+          type: string
+          description: Stock keeping unit
+        stockQuantity:
+          type: integer
+          description: Current stock level
+        warehouseLocation:
+          type: string
+          description: Warehouse location code
+    StockLevel:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: string
+          description: Product identifier
+        quantity:
+          type: integer
+          description: Current stock quantity
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Last stock update timestamp
+    StockUpdate:
+      type: object
+      required:
+        - adjustment
+      properties:
+        adjustment:
+          type: integer
+          description: Stock adjustment (positive or negative)
+        reason:
+          type: string
+          description: Reason for stock adjustment
