@@ -16,6 +16,14 @@
         <div class="form-row">
             <div class="input-section" data-field="base">
                 <label>Base Specification (before)</label>
+                <div class="example-picker">
+                    <select onchange="loadExample(this, 'base')">
+                        <option value="">Load Example...</option>
+                        <option value="petstore-3.0">Petstore v1 (Base)</option>
+                        <option value="petstore-v2">Petstore v2 (Safe Changes)</option>
+                        <option value="petstore-v3">Petstore v3 (Breaking)</option>
+                    </select>
+                </div>
                 <div class="input-tabs">
                     <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">File</button>
                     <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste</button>
@@ -36,6 +44,14 @@
 
             <div class="input-section" data-field="head">
                 <label>Head Specification (after)</label>
+                <div class="example-picker">
+                    <select onchange="loadExample(this, 'head')">
+                        <option value="">Load Example...</option>
+                        <option value="petstore-3.0">Petstore v1 (Base)</option>
+                        <option value="petstore-v2">Petstore v2 (Safe Changes)</option>
+                        <option value="petstore-v3">Petstore v3 (Breaking)</option>
+                    </select>
+                </div>
                 <div class="input-tabs">
                     <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">File</button>
                     <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste</button>

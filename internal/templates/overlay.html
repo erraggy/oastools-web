@@ -16,6 +16,12 @@
         <div class="form-row">
             <div class="input-section" data-field="spec">
                 <label>Specification</label>
+                <div class="example-picker">
+                    <select onchange="loadExample(this, 'spec')">
+                        <option value="">Load Example...</option>
+                        <option value="petstore-3.0">Petstore (Base)</option>
+                    </select>
+                </div>
                 <div class="input-tabs">
                     <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">File</button>
                     <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste</button>
@@ -36,6 +42,14 @@
 
             <div class="input-section" data-field="overlay">
                 <label>Overlay</label>
+                <div class="example-picker">
+                    <select onchange="loadExample(this, 'overlay')">
+                        <option value="">Load Example...</option>
+                        <option value="overlay-descriptions">Add Descriptions</option>
+                        <option value="overlay-security">Add Security</option>
+                        <option value="overlay-public">Public API</option>
+                    </select>
+                </div>
                 <div class="input-tabs">
                     <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">File</button>
                     <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste</button>

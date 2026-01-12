@@ -131,3 +131,24 @@ async function loadExample(select, fieldName) {
         select.value = '';
     }
 }
+
+// Load example for join page (copies to clipboard for pasting)
+async function loadJoinExample(select) {
+    const exampleName = select.value;
+    if (!exampleName) return;
+
+    try {
+        const response = await fetch(`/api/examples/${exampleName}`);
+        if (!response.ok) throw new Error(`Failed to load: ${response.statusText}`);
+        const content = await response.text();
+
+        await navigator.clipboard.writeText(content);
+        alert(`${select.options[select.selectedIndex].text} copied to clipboard. Paste it into one of the spec inputs.`);
+
+        select.value = '';
+    } catch (error) {
+        console.error('Failed to load example:', error);
+        alert('Failed to load example.');
+        select.value = '';
+    }
+}

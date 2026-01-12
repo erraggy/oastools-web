@@ -14,6 +14,15 @@
           enctype="multipart/form-data">
         <div class="form-group">
             <label for="specs">Specification Files (2-5 files)</label>
+            <div class="example-picker">
+                <select onchange="loadJoinExample(this)">
+                    <option value="">Add Example...</option>
+                    <option value="users-api">Users API</option>
+                    <option value="products-api">Products API</option>
+                    <option value="orders-api">Orders API</option>
+                    <option value="inventory-api">Inventory API (Conflicts)</option>
+                </select>
+            </div>
             <input type="file" id="specs" name="specs" accept=".json,.yaml,.yml" multiple required>
             <small>Select 2-5 JSON or YAML files (max 1MB each)</small>
         </div>
