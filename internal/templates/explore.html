@@ -56,22 +56,26 @@
         <summary>Usage Examples</summary>
         <div class="docs-content">
             <h4>Go Library</h4>
-            <pre><code class="language-go">import "github.com/erraggy/oastools/parser"
-
-// Parse and explore the specification
-result, err := parser.ParseWithOptions(
-    parser.WithFilePath("openapi.yaml"),
-    parser.WithResolveRefs(true),
+            <pre><code class="language-go">import (
+    "github.com/erraggy/oastools/parser"
+    "github.com/erraggy/oastools/walker"
 )
 
-// Access paths and operations
-for path, item := range result.Document.Paths {
-    fmt.Printf("Path: %s\n", path)
+// Parse the specification
+result, err := parser.ParseWithOptions(
+    parser.WithFilePath("openapi.yaml"),
+)
+
+// Collect and iterate operations
+ops, _ := walker.CollectOperations(result)
+for _, op := range ops.All {
+    fmt.Printf("%s %s\n", op.Method, op.PathTemplate)
 }
 
-// Access schemas
-for name, schema := range result.Document.Components.Schemas {
-    fmt.Printf("Schema: %s\n", name)
+// Collect and iterate schemas
+schemas, _ := walker.CollectSchemas(result)
+for _, s := range schemas.Components {
+    fmt.Printf("Schema: %s\n", s.Name)
 }</code></pre>
 
             <h4>CLI</h4>

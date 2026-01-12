@@ -604,7 +604,7 @@ small {
 
 /* Operation page styling */
 .operation-page {
-    max-width: 800px;
+    /* No max-width - let content use full container width */
 }
 
 .operation-page h1 {
