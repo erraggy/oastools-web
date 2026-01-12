@@ -1,0 +1,621 @@
+{{define "explore_results"}}
+<div class="explore-container" data-hash="{{.Analysis.Hash}}">
+    <div class="explore-summary">
+        <div class="summary-header">
+            <span class="summary-version">{{.Analysis.Version}}</span>
+            <span class="summary-filename">{{.Analysis.Filename}}</span>
+        </div>
+        <div class="summary-stats">
+            <span class="stat">Paths: <strong>{{.Analysis.Stats.PathCount}}</strong></span>
+            <span class="stat">Operations: <strong>{{.Analysis.Stats.OperationCount}}</strong></span>
+            <span class="stat">Schemas: <strong>{{.Analysis.Stats.SchemaCount}}</strong></span>
+            <button type="button" class="summary-expand-btn"
+                    hx-get="/api/explore/summary-details?h={{.Analysis.Hash}}"
+                    hx-target="#summary-details"
+                    hx-swap="innerHTML">
+                Show details
+            </button>
+        </div>
+        <div id="summary-details"></div>
+    </div>
+
+    <div class="explore-tabs">
+        <div class="tab-buttons">
+            <button type="button" class="tab-btn active" data-tab="operations"
+                    hx-get="/api/explore/operations?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    hx-trigger="load, click">
+                Operations ({{.Analysis.Stats.OperationCount}})
+            </button>
+            <button type="button" class="tab-btn" data-tab="schemas"
+                    hx-get="/api/explore/schemas?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML">
+                Schemas ({{.Analysis.Stats.SchemaCount}})
+            </button>
+            <button type="button" class="tab-btn" data-tab="security"
+                    hx-get="/api/explore/security?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML">
+                Security ({{len .Analysis.Security}})
+            </button>
+        </div>
+        <div class="tab-controls">
+            <label for="group-by">Group by:</label>
+            <select id="group-by" name="group"
+                    hx-get="/api/explore/operations?h={{.Analysis.Hash}}"
+                    hx-target="#tab-content"
+                    hx-swap="innerHTML"
+                    hx-include="this">
+                <option value="path" selected>Path</option>
+                <option value="tag">Tag</option>
+                <option value="method">Method</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="tab-content" class="tab-content">
+        <p class="loading-message">Loading operations...</p>
+    </div>
+</div>
+{{end}}
+
+{{define "explore_operations"}}
+<div class="operations-panel">
+<div class="operations-list">
+    {{if eq .Group "path"}}
+        {{range $path, $ops := .Analysis.Operations.ByPath}}
+        <details class="operation-group" open>
+            <summary class="group-header">
+                <span class="group-title">{{$path}}</span>
+                <span class="group-count">{{len $ops}} operation{{if ne (len $ops) 1}}s{{end}}</span>
+            </summary>
+            <div class="group-content">
+                {{range $ops}}
+                <div class="operation-row"
+                     hx-get="/api/explore/operation?h={{$.Analysis.Hash}}&amp;path={{$path}}&amp;method={{.Method}}"
+                     hx-target="#operation-detail"
+                     hx-swap="innerHTML">
+                    <span class="method-badge method-{{.Method}}">
+                        {{if eq .Method "get"}}<span class="method-glyph" aria-hidden="true">&#8595;</span>{{end}}
+                        {{if eq .Method "post"}}<span class="method-glyph" aria-hidden="true">&#8593;</span>{{end}}
+                        {{if eq .Method "put"}}<span class="method-glyph" aria-hidden="true">&#8594;</span>{{end}}
+                        {{if eq .Method "patch"}}<span class="method-glyph" aria-hidden="true">~</span>{{end}}
+                        {{if eq .Method "delete"}}<span class="method-glyph" aria-hidden="true">&#215;</span>{{end}}
+                        {{.Method}}
+                    </span>
+                    <span class="operation-summary">
+                        {{if .Operation.Summary}}{{.Operation.Summary}}{{else if .Operation.OperationID}}{{.Operation.OperationID}}{{else}}(no summary){{end}}
+                    </span>
+                </div>
+                {{end}}
+            </div>
+        </details>
+        {{else}}
+        <p class="empty-message">No operations found.</p>
+        {{end}}
+    {{else if eq .Group "tag"}}
+        {{if .Analysis.Operations.ByTag}}
+            {{range $tag, $ops := .Analysis.Operations.ByTag}}
+            <details class="operation-group" open>
+                <summary class="group-header">
+                    <span class="group-title">{{$tag}}</span>
+                    <span class="group-count">{{len $ops}} operation{{if ne (len $ops) 1}}s{{end}}</span>
+                </summary>
+                <div class="group-content">
+                    {{range $ops}}
+                    <div class="operation-row"
+                         hx-get="/api/explore/operation?h={{$.Analysis.Hash}}&amp;path={{.PathTemplate}}&amp;method={{.Method}}"
+                         hx-target="#operation-detail"
+                         hx-swap="innerHTML">
+                        <span class="method-badge method-{{.Method}}">
+                            {{if eq .Method "get"}}<span class="method-glyph" aria-hidden="true">&#8595;</span>{{end}}
+                            {{if eq .Method "post"}}<span class="method-glyph" aria-hidden="true">&#8593;</span>{{end}}
+                            {{if eq .Method "put"}}<span class="method-glyph" aria-hidden="true">&#8594;</span>{{end}}
+                            {{if eq .Method "patch"}}<span class="method-glyph" aria-hidden="true">~</span>{{end}}
+                            {{if eq .Method "delete"}}<span class="method-glyph" aria-hidden="true">&#215;</span>{{end}}
+                            {{.Method}}
+                        </span>
+                        <span class="operation-path">{{.PathTemplate}}</span>
+                        <span class="operation-summary">
+                            {{if .Operation.Summary}}{{.Operation.Summary}}{{else if .Operation.OperationID}}{{.Operation.OperationID}}{{else}}(no summary){{end}}
+                        </span>
+                    </div>
+                    {{end}}
+                </div>
+            </details>
+            {{end}}
+        {{else}}
+        <p class="empty-message">No tagged operations found. Operations without tags are not shown in tag view.</p>
+        {{end}}
+    {{else if eq .Group "method"}}
+        {{range $method, $ops := .Analysis.Operations.ByMethod}}
+        <details class="operation-group" open>
+            <summary class="group-header">
+                <span class="method-badge method-{{$method}}">
+                    {{if eq $method "get"}}<span class="method-glyph" aria-hidden="true">&#8595;</span>{{end}}
+                    {{if eq $method "post"}}<span class="method-glyph" aria-hidden="true">&#8593;</span>{{end}}
+                    {{if eq $method "put"}}<span class="method-glyph" aria-hidden="true">&#8594;</span>{{end}}
+                    {{if eq $method "patch"}}<span class="method-glyph" aria-hidden="true">~</span>{{end}}
+                    {{if eq $method "delete"}}<span class="method-glyph" aria-hidden="true">&#215;</span>{{end}}
+                    {{$method}}
+                </span>
+                <span class="group-count">{{len $ops}} operation{{if ne (len $ops) 1}}s{{end}}</span>
+            </summary>
+            <div class="group-content">
+                {{range $ops}}
+                <div class="operation-row"
+                     hx-get="/api/explore/operation?h={{$.Analysis.Hash}}&amp;path={{.PathTemplate}}&amp;method={{.Method}}"
+                     hx-target="#operation-detail"
+                     hx-swap="innerHTML">
+                    <span class="operation-path">{{.PathTemplate}}</span>
+                    <span class="operation-summary">
+                        {{if .Operation.Summary}}{{.Operation.Summary}}{{else if .Operation.OperationID}}{{.Operation.OperationID}}{{else}}(no summary){{end}}
+                    </span>
+                </div>
+                {{end}}
+            </div>
+        </details>
+        {{else}}
+        <p class="empty-message">No operations found.</p>
+        {{end}}
+    {{else}}
+        <p class="empty-message">Unknown grouping: {{.Group}}</p>
+    {{end}}
+</div>
+<div id="operation-detail" class="operation-detail">
+    <p class="empty-message">Select an operation to view details.</p>
+</div>
+</div>
+{{end}}
+
+{{define "explore_schemas"}}
+<div class="schemas-container">
+    <div class="schemas-header">
+        <span class="schemas-count">Component Schemas ({{len .Analysis.Schemas.Components}})</span>
+        <span class="inline-count">
+            Inline Schemas: {{.Analysis.Stats.InlineCount}}
+            {{if gt .Analysis.Stats.InlineCount 0}}
+            <button type="button" class="inline-expand-btn"
+                    hx-get="/api/explore/inline-schemas?h={{.Analysis.Hash}}"
+                    hx-target="#inline-schemas-list"
+                    hx-swap="innerHTML">
+                Show locations
+            </button>
+            {{end}}
+        </span>
+    </div>
+
+    <div id="inline-schemas-list"></div>
+
+    <div class="schemas-panel">
+        <div class="schemas-list">
+            {{$hash := .Analysis.Hash}}
+            {{range .Analysis.Schemas.Components}}
+            <div class="schema-row"
+                 hx-get="/api/explore/schema?h={{$hash}}&amp;name={{.Name | urlquery}}"
+                 hx-target="#schema-detail"
+                 hx-swap="innerHTML">
+                <span class="schema-name">{{.Name}}</span>
+                <span class="type-badge">{{template "schema_type_badge" .Schema}}</span>
+                <span class="schema-preview">{{template "schema_preview" .Schema}}</span>
+                <span class="schema-arrow">→</span>
+            </div>
+            {{end}}
+        </div>
+
+        <div id="schema-detail" class="schema-detail">
+            <p class="empty-message">Select a schema to view details.</p>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "schema_type_badge"}}{{if .Enum}}[enum]{{else if eq (formatType .Type) "array"}}[array]{{else if .AllOf}}{allOf}{{else if .OneOf}}{oneOf}{{else if .AnyOf}}{anyOf}{{else if .Properties}}{object}{{else}}{{formatType .Type}}{{end}}{{end}}
+
+{{define "schema_preview"}}{{if .Properties}}{{range $i, $name := propNames .Properties}}{{if $i}}, {{end}}{{$name}}{{if ge $i 3}}...{{break}}{{end}}{{end}}{{else if .Enum}}{{range $i, $v := .Enum}}{{if $i}}, {{end}}{{$v}}{{if ge $i 4}}...{{break}}{{end}}{{end}}{{else if eq (formatType .Type) "array"}}→ {{if .Items}}{{template "schema_items_type" .Items}}{{end}}{{end}}{{end}}
+
+{{define "schema_items_type"}}{{if isSchema .}}{{if .Ref}}{{schemaName .Ref}}{{else}}{{formatType .Type}}{{end}}{{end}}{{end}}
+
+{{define "explore_security"}}
+<div class="security-container">
+    <div class="security-header">
+        <span class="security-count">Security Schemes ({{len .Analysis.Security}})</span>
+        <span class="coverage">
+            Coverage: {{.Analysis.Stats.SecuredCount}}/{{.Analysis.Stats.OperationCount}}
+            {{if gt .Analysis.Stats.UnsecuredCount 0}}
+            <button type="button" class="unsecured-expand-btn"
+                    hx-get="/api/explore/unsecured?h={{.Analysis.Hash}}"
+                    hx-target="#unsecured-list"
+                    hx-swap="innerHTML">
+                Show unsecured
+            </button>
+            {{end}}
+        </span>
+    </div>
+
+    <div id="unsecured-list"></div>
+
+    <div class="security-panel">
+        {{if .Analysis.Security}}
+        <div class="security-list">
+            {{$hash := .Analysis.Hash}}
+            {{range .Analysis.Security}}
+            <div class="security-row"
+                 hx-get="/api/explore/security-detail?h={{$hash}}&amp;name={{.Name | urlquery}}"
+                 hx-target="#security-detail"
+                 hx-swap="innerHTML">
+                <div class="security-main">
+                    <span class="security-name">{{.Name}}</span>
+                    <span class="security-type-badge">[{{.Type}}]</span>
+                </div>
+                <div class="security-config">
+                    {{if eq .Type "apiKey"}}
+                    {{.In}}: {{.ParamName}}
+                    {{else if eq .Type "http"}}
+                    scheme: {{.Scheme}}
+                    {{else if eq .Type "oauth2"}}
+                    {{range .Flows}}{{.Type}} flow{{if not (eq .Type "")}} {{end}}{{end}}
+                    {{else if eq .Type "openIdConnect"}}
+                    OpenID Connect
+                    {{end}}
+                </div>
+                <div class="security-usage">
+                    Used by {{.UsageCount}} operations
+                </div>
+                <span class="security-arrow">-></span>
+            </div>
+            {{end}}
+        </div>
+        {{else}}
+        <div class="no-security">
+            No security schemes defined
+        </div>
+        {{end}}
+
+        <div id="security-detail" class="security-detail">
+            <p class="empty-message">Select a security scheme to view details.</p>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "explore_schema_detail"}}
+<div class="detail-card" id="schema-{{.Name}}">
+    <div class="detail-header">
+        <span class="schema-name">{{.Name}}</span>
+        <span class="type-badge">{{template "schema_type_badge" .Schema}}</span>
+    </div>
+
+    {{if .Schema.Description}}
+    <p class="detail-description">{{.Schema.Description}}</p>
+    {{end}}
+
+    {{if .Schema.Properties}}
+    <div class="detail-section">
+        <h4>Properties</h4>
+        <table class="props-table">
+            <thead>
+                <tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                {{$required := .Schema.Required}}
+                {{range $name, $prop := .Schema.Properties}}
+                <tr>
+                    <td><code>{{$name}}</code></td>
+                    <td>
+                        {{if $prop.Ref}}<a href="#schema-{{schemaName $prop.Ref}}">{{schemaName $prop.Ref}}</a>
+                        {{else}}{{formatType $prop.Type}}{{if $prop.Format}} ({{$prop.Format}}){{end}}{{end}}
+                    </td>
+                    <td>{{if contains $required $name}}Yes{{else}}No{{end}}</td>
+                    <td>{{$prop.Description}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{end}}
+
+    {{if .Schema.Enum}}
+    <div class="detail-section">
+        <h4>Enum Values</h4>
+        <ul class="enum-list">{{range .Schema.Enum}}<li><code>{{.}}</code></li>{{end}}</ul>
+    </div>
+    {{end}}
+
+    {{if .UsedIn}}
+    <div class="detail-section">
+        <h4>Used In</h4>
+        <ul class="used-in-list">
+            {{range .UsedIn}}
+            <li>
+                <span class="method-badge method-{{.Method}}">{{.Method}}</span>
+                <span>{{.PathTemplate}}</span>
+                <span class="usage-context">({{.Context}})</span>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "explore_inline_schemas"}}
+<div class="inline-schemas-section">
+    <div class="inline-header">
+        <span>Inline Schemas: {{len .InlineSchemas}}</span>
+        <button type="button" class="inline-collapse-btn">Hide</button>
+    </div>
+    <div class="inline-list">
+        {{range .InlineSchemas}}
+        <div class="inline-row">
+            <span class="method-badge method-{{.Method}}">{{.Method}}</span>
+            <span class="inline-path">{{.PathTemplate}}</span>
+            <span class="inline-context">({{.Context}})</span>
+            <span class="type-badge">{{.Type}}</span>
+        </div>
+        {{end}}
+    </div>
+    {{if gt (len .InlineSchemas) 10}}
+    <div class="inline-warning">
+        Warning: High inline count may indicate opportunities for schema reuse
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "explore_operation_detail"}}
+<div class="detail-card" id="op-{{.OperationID}}">
+    <div class="detail-header">
+        <span class="method-badge method-{{.Method}}">
+            {{if eq .Method "get"}}<span class="method-glyph" aria-hidden="true">&#8595;</span>{{end}}
+            {{if eq .Method "post"}}<span class="method-glyph" aria-hidden="true">&#8593;</span>{{end}}
+            {{if eq .Method "put"}}<span class="method-glyph" aria-hidden="true">&#8594;</span>{{end}}
+            {{if eq .Method "patch"}}<span class="method-glyph" aria-hidden="true">~</span>{{end}}
+            {{if eq .Method "delete"}}<span class="method-glyph" aria-hidden="true">&#215;</span>{{end}}
+            {{.Method}}
+        </span>
+        <span class="detail-path">{{.PathTemplate}}</span>
+    </div>
+
+    {{if .Operation.Summary}}
+    <p class="detail-summary">{{.Operation.Summary}}</p>
+    {{end}}
+
+    {{if .Operation.Description}}
+    <p class="detail-description">{{.Operation.Description}}</p>
+    {{end}}
+
+    {{if .Operation.Parameters}}
+    <div class="detail-section">
+        <h4>Parameters</h4>
+        <table class="params-table">
+            <thead>
+                <tr><th>Name</th><th>In</th><th>Required</th><th>Type</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                {{range .Operation.Parameters}}
+                <tr>
+                    <td><code>{{.Name}}</code></td>
+                    <td>{{.In}}</td>
+                    <td>{{if .Required}}Yes{{else}}No{{end}}</td>
+                    <td>{{if .Schema}}{{.Schema.Type}}{{else}}{{.Type}}{{end}}</td>
+                    <td>{{.Description}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{end}}
+
+    {{if .Operation.RequestBody}}
+    <div class="detail-section">
+        <h4>Request Body{{if .Operation.RequestBody.Required}} <span class="required-badge">Required</span>{{end}}</h4>
+        {{if .Operation.RequestBody.Description}}
+        <p>{{.Operation.RequestBody.Description}}</p>
+        {{end}}
+        {{if .Operation.RequestBody.Content}}
+        <ul class="content-types">
+            {{range $contentType, $mediaType := .Operation.RequestBody.Content}}
+            <li>
+                <code>{{$contentType}}</code>
+                {{if $mediaType.Schema}}{{if $mediaType.Schema.Ref}} &rarr; {{schemaName $mediaType.Schema.Ref}}{{end}}{{end}}
+            </li>
+            {{end}}
+        </ul>
+        {{end}}
+    </div>
+    {{end}}
+
+    {{if .Operation.Responses}}
+    <div class="detail-section">
+        <h4>Responses</h4>
+        <table class="responses-table">
+            <thead>
+                <tr><th>Status</th><th>Description</th><th>Schema</th></tr>
+            </thead>
+            <tbody>
+                {{if .Operation.Responses.Default}}
+                <tr>
+                    <td><code>default</code></td>
+                    <td>{{.Operation.Responses.Default.Description}}</td>
+                    <td>{{if .Operation.Responses.Default.Schema}}{{if .Operation.Responses.Default.Schema.Ref}}{{schemaName .Operation.Responses.Default.Schema.Ref}}{{end}}{{else}}{{range $ct, $mt := .Operation.Responses.Default.Content}}{{if $mt.Schema}}{{if $mt.Schema.Ref}}{{schemaName $mt.Schema.Ref}}{{end}}{{end}}{{end}}{{end}}</td>
+                </tr>
+                {{end}}
+                {{range $status, $response := .Operation.Responses.Codes}}
+                <tr>
+                    <td><code>{{$status}}</code></td>
+                    <td>{{$response.Description}}</td>
+                    <td>{{if $response.Schema}}{{if $response.Schema.Ref}}{{schemaName $response.Schema.Ref}}{{end}}{{else}}{{range $ct, $mt := $response.Content}}{{if $mt.Schema}}{{if $mt.Schema.Ref}}{{schemaName $mt.Schema.Ref}}{{end}}{{end}}{{end}}{{end}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{end}}
+
+    {{if .Operation.Security}}
+    <div class="detail-section">
+        <h4>Security</h4>
+        <ul class="security-list">
+            {{range .Operation.Security}}
+            {{range $scheme, $scopes := .}}
+            <li><strong>{{$scheme}}</strong>{{if $scopes}} ({{range $i, $s := $scopes}}{{if $i}}, {{end}}{{$s}}{{end}}){{end}}</li>
+            {{end}}
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "explore_security_detail"}}
+<div class="detail-card" id="security-{{.Scheme.Name}}">
+    <div class="detail-header">
+        <span class="security-name">{{.Scheme.Name}}</span>
+        <span class="security-type-badge">[{{.Scheme.Type}}]</span>
+    </div>
+
+    <div class="detail-section">
+        <h4>Configuration</h4>
+        {{if eq .Scheme.Type "apiKey"}}
+        <dl class="config-list">
+            <dt>Location</dt>
+            <dd><code>{{.Scheme.In}}</code></dd>
+            <dt>Parameter Name</dt>
+            <dd><code>{{.Scheme.ParamName}}</code></dd>
+        </dl>
+        {{else if eq .Scheme.Type "http"}}
+        <dl class="config-list">
+            <dt>Scheme</dt>
+            <dd><code>{{.Scheme.Scheme}}</code></dd>
+        </dl>
+        {{else if eq .Scheme.Type "oauth2"}}
+        {{range .Scheme.Flows}}
+        <div class="oauth-flow">
+            <h5>{{.Type}} flow</h5>
+            <dl class="config-list">
+                {{if .AuthorizationURL}}
+                <dt>Authorization URL</dt>
+                <dd><code>{{.AuthorizationURL}}</code></dd>
+                {{end}}
+                {{if .TokenURL}}
+                <dt>Token URL</dt>
+                <dd><code>{{.TokenURL}}</code></dd>
+                {{end}}
+                {{if .RefreshURL}}
+                <dt>Refresh URL</dt>
+                <dd><code>{{.RefreshURL}}</code></dd>
+                {{end}}
+                {{if .Scopes}}
+                <dt>Scopes</dt>
+                <dd>
+                    <ul class="scope-list">
+                        {{range $scope, $desc := .Scopes}}
+                        <li><code>{{$scope}}</code>: {{$desc}}</li>
+                        {{end}}
+                    </ul>
+                </dd>
+                {{end}}
+            </dl>
+        </div>
+        {{end}}
+        {{else if eq .Scheme.Type "openIdConnect"}}
+        <dl class="config-list">
+            <dt>OpenID Connect URL</dt>
+            <dd><code>{{.Scheme.OpenIDURL}}</code></dd>
+        </dl>
+        {{end}}
+    </div>
+
+    {{if .UsedBy}}
+    <div class="detail-section">
+        <h4>Used By ({{len .UsedBy}} operations)</h4>
+        <ul class="used-by-list">
+            {{range .UsedBy}}
+            <li>
+                <span class="method-badge method-{{.Method}}">{{.Method}}</span>
+                <span>{{.PathTemplate}}</span>
+                {{if .Scopes}}
+                <span class="usage-scopes">({{join .Scopes ", "}})</span>
+                {{end}}
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{else}}
+    <div class="detail-section">
+        <p class="empty-message">Not used by any operations</p>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "explore_unsecured"}}
+<div class="unsecured-section">
+    <div class="unsecured-header">
+        <span>Unsecured Operations: {{len .UnsecuredOps}}</span>
+        <button type="button" class="unsecured-collapse-btn">Hide</button>
+    </div>
+    {{if .UnsecuredOps}}
+    <div class="unsecured-list">
+        {{range .UnsecuredOps}}
+        <div class="unsecured-row">
+            <span class="method-badge method-{{.Method}}">{{.Method}}</span>
+            <span class="unsecured-path">{{.PathTemplate}}</span>
+            {{if .Summary}}
+            <span class="unsecured-summary">{{truncate .Summary 50}}</span>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="empty-message">All operations are secured</p>
+    {{end}}
+</div>
+{{end}}
+
+{{define "explore_summary_details"}}
+<div class="summary-details">
+    <div class="detail-section">
+        <h4>Method Breakdown</h4>
+        <div class="method-breakdown">
+            {{range $method, $count := .Analysis.Stats.MethodCounts}}
+            <span class="method-stat">
+                <span class="method-badge method-{{$method}}">{{$method}}</span>
+                <strong>{{$count}}</strong>
+            </span>
+            {{end}}
+        </div>
+    </div>
+
+    <div class="detail-section">
+        <h4>Schema Breakdown</h4>
+        <dl class="breakdown-list">
+            <dt>Component Schemas</dt>
+            <dd><strong>{{.Analysis.Stats.SchemaCount}}</strong></dd>
+            <dt>Inline Schemas</dt>
+            <dd><strong>{{.Analysis.Stats.InlineCount}}</strong></dd>
+        </dl>
+    </div>
+
+    <div class="detail-section">
+        <h4>Security Coverage</h4>
+        <dl class="breakdown-list">
+            <dt>Secured Operations</dt>
+            <dd><strong>{{.Analysis.Stats.SecuredCount}}</strong></dd>
+            <dt>Unsecured Operations</dt>
+            <dd><strong>{{.Analysis.Stats.UnsecuredCount}}</strong></dd>
+            <dt>Coverage</dt>
+            <dd>
+                {{if gt .Analysis.Stats.OperationCount 0}}
+                <strong>{{.CoveragePercent}}%</strong>
+                {{else}}
+                <strong>N/A</strong>
+                {{end}}
+            </dd>
+        </dl>
+    </div>
+</div>
+{{end}}

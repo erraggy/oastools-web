@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,6 +18,9 @@ import (
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/parser"
 )
+
+// jsonNullType is the JSON schema null type string used in OAS 3.1+ type arrays.
+const jsonNullType = "null"
 
 // Handler is the main HTTP handler for the application.
 type Handler struct {
@@ -39,15 +44,73 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		return nil, fmt.Errorf("parse base template: %w", err)
 	}
 
-	// Parse partials for result rendering
-	partials, err := template.ParseFS(templates.FS, "partials/*.html")
+	// Template functions for partials
+	funcMap := template.FuncMap{
+		// schemaName extracts the schema name from a $ref path
+		// e.g., "#/components/schemas/Pet" -> "Pet"
+		"schemaName": func(ref string) string {
+			parts := strings.Split(ref, "/")
+			return parts[len(parts)-1]
+		},
+		// join concatenates slice elements with a separator
+		"join": strings.Join,
+		// contains checks if a string slice contains a specific item
+		"contains": slices.Contains[[]string, string],
+		// truncate shortens a string to max length, appending "..." if truncated
+		"truncate": func(s string, max int) string {
+			if len(s) <= max {
+				return s
+			}
+			return s[:max-3] + "..."
+		},
+		// propNames returns sorted property names from a schema properties map
+		"propNames": func(props map[string]*parser.Schema) []string {
+			names := make([]string, 0, len(props))
+			for name := range props {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			return names
+		},
+		// isSchema checks if the value is a *parser.Schema (vs bool for OAS 3.1+)
+		"isSchema": func(v any) bool {
+			_, ok := v.(*parser.Schema)
+			return ok
+		},
+		// formatType handles OAS 3.1+ type arrays (e.g., ["string", "null"])
+		"formatType": func(t any) string {
+			switch v := t.(type) {
+			case string:
+				return v
+			case []any:
+				var types []string
+				for _, item := range v {
+					if s, ok := item.(string); ok && s != jsonNullType {
+						types = append(types, s)
+					}
+				}
+				if len(types) == 0 {
+					return jsonNullType
+				}
+				if len(types) == 1 {
+					return types[0]
+				}
+				return strings.Join(types, "|")
+			default:
+				return ""
+			}
+		},
+	}
+
+	// Parse partials for result rendering with custom functions
+	partials, err := template.New("").Funcs(funcMap).ParseFS(templates.FS, "partials/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse partials: %w", err)
 	}
 
 	// Parse each page template into a cloned base to avoid block collisions
 	pageTemplates := make(map[string]*template.Template)
-	pages := []string{"index.html", "validate.html", "convert.html", "diff.html", "fix.html", "join.html", "overlay.html"}
+	pages := []string{"index.html", "validate.html", "convert.html", "diff.html", "fix.html", "join.html", "overlay.html", "explore.html"}
 	for _, page := range pages {
 		// Clone base template so each page gets its own copy
 		clone, err := base.Clone()
@@ -174,6 +237,8 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 		templateName = "join.html"
 	case "/overlay":
 		templateName = "overlay.html"
+	case "/explore":
+		templateName = "explore.html"
 	default:
 		http.NotFound(w, r)
 		return
@@ -202,6 +267,7 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 // Stop performs cleanup for graceful shutdown.
 func (h *Handler) Stop() {
 	h.rateLimiter.Stop()
+	exploreCache.Stop()
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,88 @@
+{{template "base" .}}
+
+{{define "title"}}Explore - oastools{{end}}
+
+{{define "scripts"}}
+<script src="/static/js/explore.js?v={{.Version}}"></script>
+{{end}}
+
+{{define "content"}}
+<section class="operation-page">
+    <h1>Explore OpenAPI Specification</h1>
+    <p>Analyze the structure of your OpenAPI specification.</p>
+
+    <form id="explore-form"
+          hx-post="/api/explore"
+          hx-target="#explore-results"
+          hx-indicator="#spinner"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data">
+
+        <div class="input-section" data-field="spec">
+            <label>Specification</label>
+            <div class="input-tabs">
+                <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">Upload File</button>
+                <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste Content</button>
+                <button type="button" class="input-tab" data-mode="url" onclick="switchInputMode(this.closest('.input-section'), 'url')">Fetch URL</button>
+            </div>
+            <div class="input-content" data-mode="file">
+                <input type="file" id="spec" name="spec" accept=".json,.yaml,.yml" data-required="true" required>
+                <small>Accepts JSON or YAML files up to 2MB</small>
+            </div>
+            <div class="input-content hidden" data-mode="paste">
+                <textarea name="spec_content" rows="12" placeholder="Paste your OpenAPI specification here (JSON or YAML)..." disabled></textarea>
+                <small>Paste JSON or YAML content directly</small>
+            </div>
+            <div class="input-content hidden" data-mode="url">
+                <input type="url" name="spec_url" placeholder="https://example.com/openapi.yaml" disabled>
+                <small>Fetch specification from a public URL</small>
+            </div>
+            <input type="hidden" name="input_mode" value="file">
+        </div>
+
+        <input type="hidden" name="hash" id="explore-hash" value="">
+
+        <button type="submit" class="btn">
+            Explore
+            <span id="spinner" class="spinner htmx-indicator"></span>
+        </button>
+    </form>
+
+    <div id="explore-results">
+        <!-- HTMX will load explore results here -->
+    </div>
+
+    <details class="usage-docs">
+        <summary>Usage Examples</summary>
+        <div class="docs-content">
+            <h4>Go Library</h4>
+            <pre><code class="language-go">import (
+    "github.com/erraggy/oastools/parser"
+    "github.com/erraggy/oastools/walker"
+)
+
+// Parse the specification
+result, err := parser.ParseWithOptions(
+    parser.WithFilePath("openapi.yaml"),
+)
+
+// Collect and iterate operations
+ops, _ := walker.CollectOperations(result)
+for _, op := range ops.All {
+    fmt.Printf("%s %s\n", op.Method, op.PathTemplate)
+}
+
+// Collect and iterate schemas
+schemas, _ := walker.CollectSchemas(result)
+for _, s := range schemas.Components {
+    fmt.Printf("Schema: %s\n", s.Name)
+}</code></pre>
+
+            <p>
+                <a href="https://erraggy.github.io/oastools/packages/parser/" target="_blank" rel="noopener">Full documentation</a>
+                · <a href="https://pkg.go.dev/github.com/erraggy/oastools/parser" target="_blank" rel="noopener">pkg.go.dev</a>
+            </p>
+        </div>
+    </details>
+</section>
+{{end}}
