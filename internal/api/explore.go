@@ -65,6 +65,20 @@ type SchemaUsage struct {
 	Context      string // e.g., "request body", "response 200"
 }
 
+// SecurityUsage represents an operation that uses a security scheme.
+type SecurityUsage struct {
+	Method       string
+	PathTemplate string
+	Scopes       []string
+}
+
+// UnsecuredOperation represents an operation with no security requirements.
+type UnsecuredOperation struct {
+	Method       string
+	PathTemplate string
+	Summary      string
+}
+
 // Cache for explore analysis results (2 minute TTL).
 var exploreCache = NewTTLCache[string, *ExploreAnalysis](2 * time.Minute)
 
@@ -726,4 +740,191 @@ func findSchemaUsages(analysis *ExploreAnalysis, schemaName string) []SchemaUsag
 	}
 
 	return usages
+}
+
+// handleExploreSecurityDetail renders the security scheme detail partial.
+func (h *Handler) handleExploreSecurityDetail(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+	hash := r.URL.Query().Get("h")
+	if hash == "" {
+		return builder.Error(http.StatusBadRequest, "Missing hash parameter")
+	}
+
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		return builder.Error(http.StatusBadRequest, "Missing name parameter")
+	}
+
+	analysis, ok := exploreCache.Get(hash)
+	if !ok {
+		return &cacheExpiredResponse{}
+	}
+
+	// Find the security scheme by name
+	var foundScheme *SecuritySchemeInfo
+	for i := range analysis.Security {
+		if analysis.Security[i].Name == name {
+			foundScheme = &analysis.Security[i]
+			break
+		}
+	}
+
+	if foundScheme == nil {
+		return builder.Error(http.StatusNotFound, "Security scheme not found")
+	}
+
+	// Find usages of this security scheme
+	usages := findSecurityUsages(analysis, name)
+
+	data := map[string]any{
+		"Scheme": foundScheme,
+		"UsedBy": usages,
+	}
+
+	return h.renderHTML("explore_security_detail", data)
+}
+
+// findSecurityUsages finds all operations that use the given security scheme.
+func findSecurityUsages(analysis *ExploreAnalysis, schemeName string) []SecurityUsage {
+	var usages []SecurityUsage
+	if analysis == nil || analysis.Operations == nil {
+		return usages
+	}
+
+	// Get global security requirements
+	var globalSecurity []parser.SecurityRequirement
+	if analysis.ParseResult != nil {
+		if doc, ok := analysis.ParseResult.OAS3Document(); ok {
+			globalSecurity = doc.Security
+		} else if doc, ok := analysis.ParseResult.OAS2Document(); ok {
+			globalSecurity = doc.Security
+		}
+	}
+
+	for _, opInfo := range analysis.Operations.All {
+		if opInfo.Operation == nil {
+			continue
+		}
+
+		// Determine which security requirements apply to this operation
+		var effectiveSecurity []parser.SecurityRequirement
+		if opInfo.Operation.Security != nil {
+			effectiveSecurity = opInfo.Operation.Security
+		} else {
+			effectiveSecurity = globalSecurity
+		}
+
+		// Check if this scheme is used
+		for _, secReq := range effectiveSecurity {
+			if scopes, found := secReq[schemeName]; found {
+				usages = append(usages, SecurityUsage{
+					Method:       opInfo.Method,
+					PathTemplate: opInfo.PathTemplate,
+					Scopes:       scopes,
+				})
+				break // Only add once per operation
+			}
+		}
+	}
+
+	return usages
+}
+
+// handleExploreUnsecured renders the unsecured operations partial.
+func (h *Handler) handleExploreUnsecured(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+	hash := r.URL.Query().Get("h")
+	if hash == "" {
+		return builder.Error(http.StatusBadRequest, "Missing hash parameter")
+	}
+
+	analysis, ok := exploreCache.Get(hash)
+	if !ok {
+		return &cacheExpiredResponse{}
+	}
+
+	// Find unsecured operations
+	unsecured := findUnsecuredOperations(analysis)
+
+	return h.renderHTML("explore_unsecured", map[string]any{
+		"UnsecuredOps": unsecured,
+	})
+}
+
+// findUnsecuredOperations finds all operations with no security requirements.
+func findUnsecuredOperations(analysis *ExploreAnalysis) []UnsecuredOperation {
+	var unsecured []UnsecuredOperation
+	if analysis == nil || analysis.Operations == nil {
+		return unsecured
+	}
+
+	// Check if document has global security
+	var hasGlobalSecurity bool
+	if analysis.ParseResult != nil {
+		if doc, ok := analysis.ParseResult.OAS3Document(); ok {
+			hasGlobalSecurity = len(doc.Security) > 0
+		} else if doc, ok := analysis.ParseResult.OAS2Document(); ok {
+			hasGlobalSecurity = len(doc.Security) > 0
+		}
+	}
+
+	for _, opInfo := range analysis.Operations.All {
+		if opInfo.Operation == nil {
+			unsecured = append(unsecured, UnsecuredOperation{
+				Method:       opInfo.Method,
+				PathTemplate: opInfo.PathTemplate,
+			})
+			continue
+		}
+
+		opSec := opInfo.Operation.Security
+
+		// An operation is unsecured if:
+		// 1. It has explicit empty security [] (opSec != nil && len(opSec) == 0), OR
+		// 2. It has nil security AND no document-level global security
+		if opSec != nil {
+			if len(opSec) == 0 {
+				// Explicitly unsecured with []
+				unsecured = append(unsecured, UnsecuredOperation{
+					Method:       opInfo.Method,
+					PathTemplate: opInfo.PathTemplate,
+					Summary:      opInfo.Operation.Summary,
+				})
+			}
+		} else if !hasGlobalSecurity {
+			// No explicit security and no global security
+			unsecured = append(unsecured, UnsecuredOperation{
+				Method:       opInfo.Method,
+				PathTemplate: opInfo.PathTemplate,
+				Summary:      opInfo.Operation.Summary,
+			})
+		}
+	}
+
+	return unsecured
+}
+
+// handleExploreSummaryDetails renders the summary details expansion partial.
+func (h *Handler) handleExploreSummaryDetails(_ context.Context, req *builder.Request) builder.Response {
+	r := req.HTTPRequest
+	hash := r.URL.Query().Get("h")
+	if hash == "" {
+		return builder.Error(http.StatusBadRequest, "Missing hash parameter")
+	}
+
+	analysis, ok := exploreCache.Get(hash)
+	if !ok {
+		return &cacheExpiredResponse{}
+	}
+
+	// Compute security coverage percentage
+	var coveragePercent int
+	if analysis.Stats.OperationCount > 0 {
+		coveragePercent = (analysis.Stats.SecuredCount * 100) / analysis.Stats.OperationCount
+	}
+
+	return h.renderHTML("explore_summary_details", map[string]any{
+		"Analysis":        analysis,
+		"CoveragePercent": coveragePercent,
+	})
 }

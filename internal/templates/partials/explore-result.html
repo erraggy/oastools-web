@@ -9,7 +9,14 @@
             <span class="stat">Paths: <strong>{{.Analysis.Stats.PathCount}}</strong></span>
             <span class="stat">Operations: <strong>{{.Analysis.Stats.OperationCount}}</strong></span>
             <span class="stat">Schemas: <strong>{{.Analysis.Stats.SchemaCount}}</strong></span>
+            <button type="button" class="summary-expand-btn"
+                    hx-get="/api/explore/summary-details?h={{.Analysis.Hash}}"
+                    hx-target="#summary-details"
+                    hx-swap="innerHTML">
+                Show details
+            </button>
         </div>
+        <div id="summary-details"></div>
     </div>
 
     <div class="explore-tabs">
@@ -453,5 +460,157 @@
         </ul>
     </div>
     {{end}}
+</div>
+{{end}}
+
+{{define "explore_security_detail"}}
+<div class="detail-card" id="security-{{.Scheme.Name}}">
+    <div class="detail-header">
+        <span class="security-name">{{.Scheme.Name}}</span>
+        <span class="security-type-badge">[{{.Scheme.Type}}]</span>
+    </div>
+
+    <div class="detail-section">
+        <h4>Configuration</h4>
+        {{if eq .Scheme.Type "apiKey"}}
+        <dl class="config-list">
+            <dt>Location</dt>
+            <dd><code>{{.Scheme.In}}</code></dd>
+            <dt>Parameter Name</dt>
+            <dd><code>{{.Scheme.ParamName}}</code></dd>
+        </dl>
+        {{else if eq .Scheme.Type "http"}}
+        <dl class="config-list">
+            <dt>Scheme</dt>
+            <dd><code>{{.Scheme.Scheme}}</code></dd>
+        </dl>
+        {{else if eq .Scheme.Type "oauth2"}}
+        {{range .Scheme.Flows}}
+        <div class="oauth-flow">
+            <h5>{{.Type}} flow</h5>
+            <dl class="config-list">
+                {{if .AuthorizationURL}}
+                <dt>Authorization URL</dt>
+                <dd><code>{{.AuthorizationURL}}</code></dd>
+                {{end}}
+                {{if .TokenURL}}
+                <dt>Token URL</dt>
+                <dd><code>{{.TokenURL}}</code></dd>
+                {{end}}
+                {{if .RefreshURL}}
+                <dt>Refresh URL</dt>
+                <dd><code>{{.RefreshURL}}</code></dd>
+                {{end}}
+                {{if .Scopes}}
+                <dt>Scopes</dt>
+                <dd>
+                    <ul class="scope-list">
+                        {{range $scope, $desc := .Scopes}}
+                        <li><code>{{$scope}}</code>: {{$desc}}</li>
+                        {{end}}
+                    </ul>
+                </dd>
+                {{end}}
+            </dl>
+        </div>
+        {{end}}
+        {{else if eq .Scheme.Type "openIdConnect"}}
+        <dl class="config-list">
+            <dt>OpenID Connect URL</dt>
+            <dd><code>{{.Scheme.OpenIDURL}}</code></dd>
+        </dl>
+        {{end}}
+    </div>
+
+    {{if .UsedBy}}
+    <div class="detail-section">
+        <h4>Used By ({{len .UsedBy}} operations)</h4>
+        <ul class="used-by-list">
+            {{range .UsedBy}}
+            <li>
+                <span class="method-badge method-{{.Method}}">{{.Method}}</span>
+                <span>{{.PathTemplate}}</span>
+                {{if .Scopes}}
+                <span class="usage-scopes">({{join .Scopes ", "}})</span>
+                {{end}}
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{else}}
+    <div class="detail-section">
+        <p class="empty-message">Not used by any operations</p>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "explore_unsecured"}}
+<div class="unsecured-section">
+    <div class="unsecured-header">
+        <span>Unsecured Operations: {{len .UnsecuredOps}}</span>
+        <button type="button" class="unsecured-collapse-btn" onclick="this.closest('.unsecured-section').remove()">
+            Hide
+        </button>
+    </div>
+    {{if .UnsecuredOps}}
+    <div class="unsecured-list">
+        {{range .UnsecuredOps}}
+        <div class="unsecured-row">
+            <span class="method-badge method-{{.Method}}">{{.Method}}</span>
+            <span class="unsecured-path">{{.PathTemplate}}</span>
+            {{if .Summary}}
+            <span class="unsecured-summary">{{truncate .Summary 50}}</span>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="empty-message">All operations are secured</p>
+    {{end}}
+</div>
+{{end}}
+
+{{define "explore_summary_details"}}
+<div class="summary-details">
+    <div class="detail-section">
+        <h4>Method Breakdown</h4>
+        <div class="method-breakdown">
+            {{range $method, $count := .Analysis.Stats.MethodCounts}}
+            <span class="method-stat">
+                <span class="method-badge method-{{$method}}">{{$method}}</span>
+                <strong>{{$count}}</strong>
+            </span>
+            {{end}}
+        </div>
+    </div>
+
+    <div class="detail-section">
+        <h4>Schema Breakdown</h4>
+        <dl class="breakdown-list">
+            <dt>Component Schemas</dt>
+            <dd><strong>{{.Analysis.Stats.SchemaCount}}</strong></dd>
+            <dt>Inline Schemas</dt>
+            <dd><strong>{{.Analysis.Stats.InlineCount}}</strong></dd>
+        </dl>
+    </div>
+
+    <div class="detail-section">
+        <h4>Security Coverage</h4>
+        <dl class="breakdown-list">
+            <dt>Secured Operations</dt>
+            <dd><strong>{{.Analysis.Stats.SecuredCount}}</strong></dd>
+            <dt>Unsecured Operations</dt>
+            <dd><strong>{{.Analysis.Stats.UnsecuredCount}}</strong></dd>
+            <dt>Coverage</dt>
+            <dd>
+                {{if gt .Analysis.Stats.OperationCount 0}}
+                <strong>{{.CoveragePercent}}%</strong>
+                {{else}}
+                <strong>N/A</strong>
+                {{end}}
+            </dd>
+        </dl>
+    </div>
 </div>
 {{end}}

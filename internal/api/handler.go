@@ -56,6 +56,13 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		"join": strings.Join,
 		// contains checks if a string slice contains a specific item
 		"contains": slices.Contains[[]string, string],
+		// truncate shortens a string to max length, appending "..." if truncated
+		"truncate": func(s string, max int) string {
+			if len(s) <= max {
+				return s
+			}
+			return s[:max-3] + "..."
+		},
 		// propNames returns sorted property names from a schema properties map
 		"propNames": func(props map[string]*parser.Schema) []string {
 			names := make([]string, 0, len(props))
