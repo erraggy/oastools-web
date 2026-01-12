@@ -857,3 +857,26 @@ small {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* Request Body section */
+.required-badge {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: color-mix(in srgb, var(--color-error) 15%, transparent);
+    color: var(--color-error);
+}
+
+.content-types {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+}
+
+.content-types li {
+    padding: 0.25rem 0;
+    font-size: 0.875rem;
+}

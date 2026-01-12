@@ -39,8 +39,20 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		return nil, fmt.Errorf("parse base template: %w", err)
 	}
 
-	// Parse partials for result rendering
-	partials, err := template.ParseFS(templates.FS, "partials/*.html")
+	// Template functions for partials
+	funcMap := template.FuncMap{
+		// schemaName extracts the schema name from a $ref path
+		// e.g., "#/components/schemas/Pet" -> "Pet"
+		"schemaName": func(ref string) string {
+			parts := strings.Split(ref, "/")
+			return parts[len(parts)-1]
+		},
+		// join concatenates slice elements with a separator
+		"join": strings.Join,
+	}
+
+	// Parse partials for result rendering with custom functions
+	partials, err := template.New("").Funcs(funcMap).ParseFS(templates.FS, "partials/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse partials: %w", err)
 	}

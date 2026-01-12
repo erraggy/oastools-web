@@ -218,24 +218,45 @@
     </div>
     {{end}}
 
+    {{if .Operation.RequestBody}}
+    <div class="detail-section">
+        <h4>Request Body{{if .Operation.RequestBody.Required}} <span class="required-badge">Required</span>{{end}}</h4>
+        {{if .Operation.RequestBody.Description}}
+        <p>{{.Operation.RequestBody.Description}}</p>
+        {{end}}
+        {{if .Operation.RequestBody.Content}}
+        <ul class="content-types">
+            {{range $contentType, $mediaType := .Operation.RequestBody.Content}}
+            <li>
+                <code>{{$contentType}}</code>
+                {{if $mediaType.Schema}}{{if $mediaType.Schema.Ref}} &rarr; {{schemaName $mediaType.Schema.Ref}}{{end}}{{end}}
+            </li>
+            {{end}}
+        </ul>
+        {{end}}
+    </div>
+    {{end}}
+
     {{if .Operation.Responses}}
     <div class="detail-section">
         <h4>Responses</h4>
         <table class="responses-table">
             <thead>
-                <tr><th>Status</th><th>Description</th></tr>
+                <tr><th>Status</th><th>Description</th><th>Schema</th></tr>
             </thead>
             <tbody>
                 {{if .Operation.Responses.Default}}
                 <tr>
                     <td><code>default</code></td>
                     <td>{{.Operation.Responses.Default.Description}}</td>
+                    <td>{{if .Operation.Responses.Default.Schema}}{{if .Operation.Responses.Default.Schema.Ref}}{{schemaName .Operation.Responses.Default.Schema.Ref}}{{end}}{{else}}{{range $ct, $mt := .Operation.Responses.Default.Content}}{{if $mt.Schema}}{{if $mt.Schema.Ref}}{{schemaName $mt.Schema.Ref}}{{end}}{{end}}{{end}}{{end}}</td>
                 </tr>
                 {{end}}
                 {{range $status, $response := .Operation.Responses.Codes}}
                 <tr>
                     <td><code>{{$status}}</code></td>
                     <td>{{$response.Description}}</td>
+                    <td>{{if $response.Schema}}{{if $response.Schema.Ref}}{{schemaName $response.Schema.Ref}}{{end}}{{else}}{{range $ct, $mt := $response.Content}}{{if $mt.Schema}}{{if $mt.Schema.Ref}}{{schemaName $mt.Schema.Ref}}{{end}}{{end}}{{end}}{{end}}</td>
                 </tr>
                 {{end}}
             </tbody>
