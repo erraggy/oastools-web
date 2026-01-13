@@ -1,5 +1,10 @@
 .DS_Store
 
+# IDE
+.idea/
+.vscode/
+*.swp
+
 # Go workspace files (local development only)
 go.work
 go.work.sum
