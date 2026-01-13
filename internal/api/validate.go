@@ -141,5 +141,5 @@ func (h *Handler) handleSpec(_ context.Context, req *builder.Request) builder.Re
 	}
 
 	return builder.NewResponse(http.StatusOK).
-		Binary("application/x-yaml", yamlBytes)
+		Binary("text/yaml; charset=utf-8", yamlBytes)
 }
