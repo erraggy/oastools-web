@@ -1,6 +1,6 @@
 # Petstore API with Fixable Issues
 # This spec demonstrates issues that the oastools fixer can automatically repair.
-# Run: oastools fix --prune-schemas --prune-paths --fix-duplicate-operationids petstore-messy.yaml
+# Run: oastools fix --prune-schemas --prune-paths --fix-duplicate-operationids --stub-missing-refs petstore-messy.yaml
 
 openapi: "3.0.3"
 info:
@@ -11,6 +11,7 @@ info:
     - Duplicate operationId values
     - Unused schemas in components
     - Empty path items
+    - Unresolved $ref pointers (stub-missing-refs)
   version: "1.0.0"
   license:
     name: Apache 2.0
@@ -151,7 +152,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  # FIXABLE ISSUE 4: Empty path item
+  # FIXABLE ISSUE 4: Unresolved $ref pointers
+  # These references point to schemas and responses that don't exist.
+  # The stub-missing-refs fixer creates empty definitions for them.
+  /pets/{petId}/toys:
+    get:
+      operationId: listPetToys
+      summary: List toys for a pet
+      tags:
+        - pets
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: A list of toys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  # Missing schema - fixer will create a stub definition
+                  $ref: "#/components/schemas/Toy"
+        # Missing response - fixer will create a stub response
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: addPetToy
+      summary: Add a toy for a pet
+      tags:
+        - pets
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              # Another missing schema reference
+              $ref: "#/components/schemas/NewToy"
+      responses:
+        "201":
+          description: Toy added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Toy"
+
+  # FIXABLE ISSUE 5: Empty path item
   # This path has parameters but no HTTP operations (no get, post, put, etc.)
   # The fixer will remove this empty path item when --prune-empty is enabled.
   /deprecated/endpoint:
@@ -211,7 +266,7 @@ components:
           type: string
           description: Error message
 
-    # FIXABLE ISSUE 5: Unused schema
+    # FIXABLE ISSUE 6: Unused schema
     # This schema is never referenced anywhere in the document.
     # The fixer will remove it when --prune-unused is enabled.
     LegacyPetFormat:
@@ -232,7 +287,7 @@ components:
             - bird
             - fish
 
-    # FIXABLE ISSUE 5 (continued): Another unused schema
+    # FIXABLE ISSUE 6 (continued): Another unused schema
     DeprecatedResponse:
       type: object
       description: Response format that is never referenced.

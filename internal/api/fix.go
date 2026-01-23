@@ -74,6 +74,9 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	if r.FormValue("expandCSVEnums") == "on" {
 		enabledFixes = append(enabledFixes, fixer.FixTypeEnumCSVExpanded)
 	}
+	if r.FormValue("stubMissingRefs") == "on" {
+		enabledFixes = append(enabledFixes, fixer.FixTypeStubMissingRef)
+	}
 
 	// If checkboxes selected, use only those fix types; otherwise nil enables all
 	if len(enabledFixes) > 0 {
