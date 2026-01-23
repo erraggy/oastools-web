@@ -89,6 +89,12 @@
                         Expand CSV enum strings to arrays
                     </label>
                 </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="stubMissingRefs">
+                        Stub missing references (create empty definitions for unresolved $ref pointers)
+                    </label>
+                </div>
             </div>
         </details>
 
@@ -115,6 +121,7 @@ result, err := fixer.FixWithOptions(
     fixer.WithEnabledFixes(
         fixer.FixTypeMissingPathParameter,
         fixer.FixTypePrunedUnusedSchema,
+        fixer.FixTypeStubMissingRef,
     ),
 )
 

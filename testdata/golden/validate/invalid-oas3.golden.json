@@ -2,6 +2,7 @@
   "errors": [
     {
       "message": "Duplicate operationId 'createItem' at 'paths./users.get' and 'paths.items.post'",
+      "operationContext": "(operationId: createItem)",
       "path": "duplicate:createItem",
       "severity": "error"
     },
@@ -12,16 +13,19 @@
     },
     {
       "message": "Path must start with '/'",
+      "operationContext": "(path: items)",
       "path": "paths.items",
       "severity": "error"
     },
     {
       "message": "Path parameters must have required: true",
+      "operationContext": "(GET items)",
       "path": "paths.items.get.parameters[0]",
       "severity": "error"
     },
     {
       "message": "RequestBody must have a content object with at least one media type",
+      "operationContext": "(operationId: createItem)",
       "path": "paths.items.post.requestBody",
       "severity": "error"
     },
@@ -73,16 +77,19 @@
   "warnings": [
     {
       "message": "Operation should have a description or summary for better documentation",
+      "operationContext": "(operationId: createItem)",
       "path": "paths./users.get",
       "severity": "warning"
     },
     {
       "message": "Operation should have a description or summary for better documentation",
+      "operationContext": "(operationId: createItem)",
       "path": "paths.items.post",
       "severity": "warning"
     },
     {
       "message": "Parameter 'id' is declared as path parameter but not used in path template",
+      "operationContext": "(GET items)",
       "path": "paths.items.get",
       "severity": "warning"
     }

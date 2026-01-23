@@ -296,6 +296,13 @@ footer .version-info {
     color: var(--color-text-muted);
 }
 
+.issue-context {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-left: 0.5rem;
+    opacity: 0.8;
+}
+
 /* Code/pre blocks */
 pre {
     border: 1px solid var(--color-border);

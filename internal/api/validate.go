@@ -23,9 +23,10 @@ type ValidateResponse struct {
 
 // ValidationIssue represents a single validation error or warning.
 type ValidationIssue struct {
-	Path     string `json:"path"`
-	Message  string `json:"message"`
-	Severity string `json:"severity"`
+	Path             string `json:"path"`
+	Message          string `json:"message"`
+	Severity         string `json:"severity"`
+	OperationContext string `json:"operationContext,omitempty"`
 }
 
 // ValidationStats contains document statistics.
@@ -95,20 +96,28 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 func (h *Handler) buildValidateResponse(valResult *validator.ValidationResult) ValidateResponse {
 	errors := make([]ValidationIssue, 0, len(valResult.Errors))
 	for _, e := range valResult.Errors {
-		errors = append(errors, ValidationIssue{
+		issue := ValidationIssue{
 			Path:     e.Path,
 			Message:  e.Message,
 			Severity: "error",
-		})
+		}
+		if e.OperationContext != nil && !e.OperationContext.IsEmpty() {
+			issue.OperationContext = e.OperationContext.String()
+		}
+		errors = append(errors, issue)
 	}
 
 	warnings := make([]ValidationIssue, 0, len(valResult.Warnings))
 	for _, w := range valResult.Warnings {
-		warnings = append(warnings, ValidationIssue{
+		issue := ValidationIssue{
 			Path:     w.Path,
 			Message:  w.Message,
 			Severity: "warning",
-		})
+		}
+		if w.OperationContext != nil && !w.OperationContext.IsEmpty() {
+			issue.OperationContext = w.OperationContext.String()
+		}
+		warnings = append(warnings, issue)
 	}
 
 	return ValidateResponse{

@@ -18,6 +18,7 @@
             {{range .Errors}}
             <li class="issue-item issue-error">
                 <code class="issue-path">{{.Path}}</code>
+                {{if .OperationContext}}<span class="issue-context">{{.OperationContext}}</span>{{end}}
                 <p class="issue-message">{{.Message}}</p>
             </li>
             {{end}}
@@ -32,6 +33,7 @@
             {{range .Warnings}}
             <li class="issue-item issue-warning">
                 <code class="issue-path">{{.Path}}</code>
+                {{if .OperationContext}}<span class="issue-context">{{.OperationContext}}</span>{{end}}
                 <p class="issue-message">{{.Message}}</p>
             </li>
             {{end}}
