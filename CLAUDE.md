@@ -48,7 +48,11 @@ make run          # Run the server locally
 docker build .    # Build container image
 ```
 
-**Important:** `make check` must pass with clean output before pushing any changes to origin.
+### Pre-Push Requirements
+Before pushing any changes to origin:
+1. Run `make check` and ensure it passes with clean output
+2. If linting makes automatic fixes (e.g., formatting), stage and include those changes
+3. Address any errors or warnings before pushing
 
 ## Architecture
 
