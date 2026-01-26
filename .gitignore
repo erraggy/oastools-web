@@ -5,6 +5,9 @@
 .vscode/
 *.swp
 
+# Claude Code local config
+.claude.local.md
+
 # Go workspace files (local development only)
 go.work
 go.work.sum
