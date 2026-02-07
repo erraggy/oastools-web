@@ -11,6 +11,7 @@ func TestLoad_Defaults(t *testing.T) {
 	for _, key := range []string{
 		"PORT", "LOG_LEVEL", "RATE_LIMIT_RPM", "RATE_LIMIT_BURST",
 		"MAX_FILE_SIZE", "REQUEST_TIMEOUT", "MAX_CONCURRENT_REQUESTS",
+		"METRICS_ENABLED",
 	} {
 		t.Setenv(key, "")
 	}
@@ -29,6 +30,7 @@ func TestLoad_Defaults(t *testing.T) {
 		{"MaxFileSize", cfg.MaxFileSize, int64(2 << 20)}, // 2MB
 		{"RequestTimeout", cfg.RequestTimeout, 30 * time.Second},
 		{"MaxConcurrentRequests", cfg.MaxConcurrentRequests, 10},
+		{"MetricsEnabled", cfg.MetricsEnabled, false},
 	}
 
 	for _, tt := range tests {
@@ -49,6 +51,7 @@ func TestLoad_EnvironmentOverrides(t *testing.T) {
 	t.Setenv("MAX_FILE_SIZE", "4194304") // 4MB
 	t.Setenv("REQUEST_TIMEOUT", "1m")
 	t.Setenv("MAX_CONCURRENT_REQUESTS", "25")
+	t.Setenv("METRICS_ENABLED", "true")
 
 	cfg := Load()
 
@@ -64,6 +67,7 @@ func TestLoad_EnvironmentOverrides(t *testing.T) {
 		{"MaxFileSize", cfg.MaxFileSize, int64(4194304)},
 		{"RequestTimeout", cfg.RequestTimeout, time.Minute},
 		{"MaxConcurrentRequests", cfg.MaxConcurrentRequests, 25},
+		{"MetricsEnabled", cfg.MetricsEnabled, true},
 	}
 
 	for _, tt := range tests {
@@ -129,6 +133,37 @@ func TestParseLogLevel_AllLevels(t *testing.T) {
 			cfg := Load()
 			if cfg.LogLevel != tt.expected {
 				t.Errorf("parseLogLevel(%q) = %v, want %v", tt.level, cfg.LogLevel, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetEnvBool_Values(t *testing.T) {
+	tests := []struct {
+		value    string
+		expected bool
+	}{
+		{"true", true},
+		{"TRUE", true},
+		{"True", true},
+		{"1", true},
+		{"yes", true},
+		{"YES", true},
+		{"false", false},
+		{"FALSE", false},
+		{"0", false},
+		{"no", false},
+		{"NO", false},
+		{"", false},        // Empty falls back to default (false)
+		{"invalid", false}, // Unrecognized falls back to default (false)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			t.Setenv("METRICS_ENABLED", tt.value)
+			cfg := Load()
+			if cfg.MetricsEnabled != tt.expected {
+				t.Errorf("getEnvBool(%q) = %v, want %v", tt.value, cfg.MetricsEnabled, tt.expected)
 			}
 		})
 	}

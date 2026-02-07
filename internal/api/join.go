@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/joiner"
@@ -49,6 +50,7 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 	// Parse all specifications
 	parseResults := make([]parser.ParseResult, 0, len(files))
 	var firstFormat string
+	var totalInputBytes int
 	for i, fileHeader := range files {
 		file, err := fileHeader.Open()
 		if err != nil {
@@ -69,17 +71,33 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 				fmt.Sprintf("file %s exceeds 1MB limit", fileHeader.Filename))
 		}
 
+		totalInputBytes += len(content)
+
 		// Track format from first file
 		if i == 0 {
 			firstFormat = detectFormat(content)
 		}
 
+		parseStart := time.Now()
 		parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
+		h.instruments.recordPackageDuration(r.Context(), "parser", parseStart)
 		if err != nil {
 			return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 				fmt.Sprintf("failed to parse %s: %v", fileHeader.Filename, err))
 		}
 		parseResults = append(parseResults, *parseResult)
+	}
+
+	// Enrich metrics context
+	if ma := getMetricsAttrs(r.Context()); ma != nil {
+		ma.enrich("join", firstFormat, totalInputBytes)
+	}
+
+	// Record spec complexity from first spec
+	if len(parseResults) > 0 {
+		stats := parser.GetDocumentStats(parseResults[0].Document)
+		h.instruments.recordSpecComplexity(r.Context(), "joiner", parseResults[0].Version,
+			stats.PathCount, stats.OperationCount, stats.SchemaCount, totalInputBytes)
 	}
 
 	// Configure joiner with collision strategy
@@ -88,7 +106,9 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 
 	// Join using parse-once pattern
 	j := joiner.New(config)
+	joinStart := time.Now()
 	joinResult, err := j.JoinParsed(parseResults)
+	h.instruments.recordPackageDuration(r.Context(), "joiner", joinStart)
 	if err != nil {
 		return h.renderError(r, http.StatusUnprocessableEntity, "JOIN_FAILED",
 			fmt.Sprintf("join operation failed: %v", err))

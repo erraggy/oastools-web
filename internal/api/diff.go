@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/differ"
@@ -50,6 +51,13 @@ func (h *Handler) handleDiff(_ context.Context, req *builder.Request) builder.Re
 		return errResp
 	}
 
+	// Enrich metrics context
+	totalInputBytes := len(baseInput.Content) + len(headInput.Content)
+	format := detectFormat(baseInput.Content)
+	if ma := getMetricsAttrs(r.Context()); ma != nil {
+		ma.enrich("diff", format, totalInputBytes)
+	}
+
 	// Parse options
 	modeStr := r.FormValue("mode")
 	mode := differ.ModeBreaking
@@ -59,23 +67,34 @@ func (h *Handler) handleDiff(_ context.Context, req *builder.Request) builder.Re
 	includeInfo := r.FormValue("includeInfo") != "off"
 
 	// Parse both specifications
+	baseParseStart := time.Now()
 	baseResult, err := parser.ParseWithOptions(parser.WithBytes(baseInput.Content))
+	h.instruments.recordPackageDuration(r.Context(), "parser", baseParseStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse base specification: %v", err))
 	}
 
+	headParseStart := time.Now()
 	headResult, err := parser.ParseWithOptions(parser.WithBytes(headInput.Content))
+	h.instruments.recordPackageDuration(r.Context(), "parser", headParseStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse head specification: %v", err))
 	}
 
+	// Record spec complexity from base spec
+	stats := parser.GetDocumentStats(baseResult.Document)
+	h.instruments.recordSpecComplexity(r.Context(), "differ", baseResult.Version,
+		stats.PathCount, stats.OperationCount, stats.SchemaCount, totalInputBytes)
+
 	// Diff using parse-once pattern
 	d := differ.New()
 	d.Mode = mode
 	d.IncludeInfo = includeInfo
+	diffStart := time.Now()
 	diffResult, err := d.DiffParsed(*baseResult, *headResult)
+	h.instruments.recordPackageDuration(r.Context(), "differ", diffStart)
 	if err != nil {
 		return h.renderError(r, http.StatusUnprocessableEntity, "DIFF_FAILED",
 			fmt.Sprintf("diff operation failed: %v", err))

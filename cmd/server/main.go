@@ -11,6 +11,12 @@ import (
 
 	"github.com/erraggy/oastools-web/internal/api"
 	"github.com/erraggy/oastools-web/internal/config"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 var version = "dev"
@@ -22,6 +28,25 @@ func main() {
 		Level: cfg.LogLevel,
 	}))
 	slog.SetDefault(logger)
+
+	// MeterProvider must be set before NewHandler, which calls otel.Meter()
+	// to create instruments. When disabled, the default no-op provider is used.
+	if cfg.MetricsEnabled {
+		mp, err := initMeterProvider(context.Background(), version)
+		if err != nil {
+			slog.Error("failed to init meter provider", "error", err)
+			os.Exit(1)
+		}
+		otel.SetMeterProvider(mp)
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := mp.Shutdown(ctx); err != nil {
+				slog.Error("meter provider shutdown error", "error", err)
+			}
+		}()
+		slog.Info("metrics enabled")
+	}
 
 	handler, err := api.NewHandler(cfg, version)
 	if err != nil {
@@ -59,4 +84,36 @@ func main() {
 		slog.Error("server error", "error", err)
 		os.Exit(1)
 	}
+}
+
+// initMeterProvider creates an OTel MeterProvider that exports to Google Cloud
+// Monitoring via OTLP gRPC. On Cloud Run, ADC handles authentication automatically.
+func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterProvider, error) {
+	exporter, err := otlpmetricgrpc.New(ctx,
+		otlpmetricgrpc.WithEndpointURL("https://telemetry.googleapis.com:443"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := resource.New(ctx,
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
+		resource.WithAttributes(
+			semconv.ServiceName("oastools-web"),
+			semconv.ServiceVersion(appVersion),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	mp := metric.NewMeterProvider(
+		metric.WithResource(res),
+		metric.WithReader(metric.NewPeriodicReader(exporter,
+			metric.WithInterval(60*time.Second),
+		)),
+	)
+
+	return mp, nil
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/converter"
@@ -35,6 +36,12 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 	input, errResp := h.readInput(r, "spec")
 	if errResp != nil {
 		return errResp
+	}
+
+	// Enrich metrics context
+	format := detectFormat(input.Content)
+	if ma := getMetricsAttrs(r.Context()); ma != nil {
+		ma.enrich("convert", format, len(input.Content))
 	}
 
 	// Get target version
@@ -77,11 +84,18 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 	}
 
 	// Parse using oastools
+	parseStart := time.Now()
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(input.Content))
+	h.instruments.recordPackageDuration(r.Context(), "parser", parseStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
 	}
+
+	// Record spec complexity
+	stats := parser.GetDocumentStats(parseResult.Document)
+	h.instruments.recordSpecComplexity(r.Context(), "converter", parseResult.Version,
+		stats.PathCount, stats.OperationCount, stats.SchemaCount, len(input.Content))
 
 	// Build conversion options
 	opts := []converter.Option{
@@ -96,14 +110,15 @@ func (h *Handler) handleConvert(_ context.Context, req *builder.Request) builder
 	}
 
 	// Convert using options pattern
+	convertStart := time.Now()
 	convertResult, err := converter.ConvertWithOptions(opts...)
+	h.instruments.recordPackageDuration(r.Context(), "converter", convertStart)
 	if err != nil {
 		return h.renderError(r, http.StatusUnprocessableEntity, "CONVERSION_FAILED",
 			fmt.Sprintf("conversion failed: %v", err))
 	}
 
 	// Serialize result in preferred format
-	format := detectFormat(input.Content)
 	output, err := serializeDocument(convertResult.Document, format)
 	if err != nil {
 		slog.Error("failed to serialize conversion result",

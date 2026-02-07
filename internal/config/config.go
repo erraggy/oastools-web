@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type Config struct {
 	MaxFileSize           int64
 	RequestTimeout        time.Duration
 	MaxConcurrentRequests int
+	MetricsEnabled        bool
 }
 
 // Load creates a Config from environment variables with sensible defaults.
@@ -28,6 +30,7 @@ func Load() *Config {
 		MaxFileSize:           getEnvInt64("MAX_FILE_SIZE", 2<<20), // 2MB
 		RequestTimeout:        getEnvDuration("REQUEST_TIMEOUT", 30*time.Second),
 		MaxConcurrentRequests: getEnvInt("MAX_CONCURRENT_REQUESTS", 10),
+		MetricsEnabled:        getEnvBool("METRICS_ENABLED", false),
 	}
 }
 
@@ -63,6 +66,18 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 		}
 	}
 	return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	v := os.Getenv(key)
+	switch strings.ToLower(v) {
+	case "true", "1", "yes":
+		return true
+	case "false", "0", "no":
+		return false
+	default:
+		return defaultValue
+	}
 }
 
 func parseLogLevel(s string) slog.Level {

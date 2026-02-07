@@ -58,6 +58,8 @@ steps:
       - '--concurrency'
       - '80'
       - '--allow-unauthenticated'
+      - '--update-env-vars'
+      - 'METRICS_ENABLED=true'
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$SHORT_SHA'
