@@ -31,6 +31,7 @@ type Handler struct {
 	partials        *template.Template            // shared partials for result rendering
 	rateLimiter     *RateLimiter
 	urlFetcher      *URLFetcher
+	instruments     *instruments
 	server          *builder.ServerResult
 	handler         http.Handler
 	staticFS        http.Handler
@@ -144,6 +145,7 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		partials:        partials,
 		rateLimiter:     NewRateLimiter(cfg.RateLimitRPM, cfg.RateLimitBurst),
 		urlFetcher:      NewURLFetcher(version, oastoolsVersion),
+		instruments:     newInstruments(),
 		staticFS:        cachedStaticHandler,
 	}
 
@@ -189,6 +191,9 @@ func (h *Handler) buildMiddlewareChain() {
 
 	// Recovery (catches panics)
 	handler = Recovery(handler)
+
+	// Metrics (records request duration, counts, errors)
+	handler = Metrics(h.instruments)(handler)
 
 	// Logging (outermost - logs everything including errors)
 	handler = Logging(handler)

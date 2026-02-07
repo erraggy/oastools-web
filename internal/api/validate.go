@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/parser"
@@ -59,24 +60,39 @@ func (h *Handler) handleValidate(_ context.Context, req *builder.Request) builde
 		return errResp
 	}
 
+	// Enrich metrics context
+	format := detectFormat(input.Content)
+	if ma := getMetricsAttrs(r.Context()); ma != nil {
+		ma.enrich("validate", format, len(input.Content))
+	}
+
 	// Parse options
 	strict := r.FormValue("strict") == "on"
 	includeWarnings := r.FormValue("includeWarnings") != "off" // Default to true (checked by default)
 	validateStructure := r.FormValue("validateStructure") != "off"
 
 	// Parse using oastools
+	parseStart := time.Now()
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(input.Content))
+	h.instruments.recordPackageDuration(r.Context(), "parser", parseStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
 	}
+
+	// Record spec complexity
+	stats := parser.GetDocumentStats(parseResult.Document)
+	h.instruments.recordSpecComplexity(r.Context(), "validator", parseResult.Version,
+		stats.PathCount, stats.OperationCount, stats.SchemaCount, len(input.Content))
 
 	// Validate using parse-once pattern
 	v := validator.New()
 	v.StrictMode = strict
 	v.IncludeWarnings = includeWarnings
 	v.ValidateStructure = validateStructure
+	validateStart := time.Now()
 	validationResult, err := v.ValidateParsed(*parseResult)
+	h.instruments.recordPackageDuration(r.Context(), "validator", validateStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "VALIDATION_FAILED",
 			fmt.Sprintf("validation error: %v", err))

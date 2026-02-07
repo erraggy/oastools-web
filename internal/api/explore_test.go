@@ -113,6 +113,7 @@ func exploreTestHandler(t *testing.T) *Handler {
 			MaxFileSize: 2 << 20,
 		},
 		partials:        partials,
+		instruments:     newInstruments(),
 		version:         "test-version",
 		oastoolsVersion: "test-oastools-version",
 	}
@@ -593,6 +594,7 @@ func inlineSchemaTestHandler(t *testing.T) *Handler {
 			MaxFileSize: 2 << 20,
 		},
 		partials:        partials,
+		instruments:     newInstruments(),
 		version:         "test-version",
 		oastoolsVersion: "test-oastools-version",
 	}
@@ -1556,6 +1558,7 @@ func securityTestHandler(t *testing.T) *Handler {
 			MaxFileSize: 2 << 20,
 		},
 		partials:        partials,
+		instruments:     newInstruments(),
 		version:         "test-version",
 		oastoolsVersion: "test-oastools-version",
 	}
@@ -1834,6 +1837,7 @@ func uploadTestHandler(t *testing.T) *Handler {
 			MaxFileSize: 2 << 20,
 		},
 		partials:        partials,
+		instruments:     newInstruments(),
 		version:         "test-version",
 		oastoolsVersion: "test-oastools-version",
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/overlay"
@@ -46,15 +47,31 @@ func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder
 		return errResp
 	}
 
+	// Enrich metrics context
+	totalInputBytes := len(specInput.Content) + len(overlayInput.Content)
+	format := detectFormat(specInput.Content)
+	if ma := getMetricsAttrs(r.Context()); ma != nil {
+		ma.enrich("overlay", format, totalInputBytes)
+	}
+
 	// Parse spec using oastools
+	parseStart := time.Now()
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(specInput.Content))
+	h.instruments.recordPackageDuration(r.Context(), "parser", parseStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
 	}
 
+	// Record spec complexity
+	stats := parser.GetDocumentStats(parseResult.Document)
+	h.instruments.recordSpecComplexity(r.Context(), "overlay", parseResult.Version,
+		stats.PathCount, stats.OperationCount, stats.SchemaCount, totalInputBytes)
+
 	// Parse overlay document
+	overlayParseStart := time.Now()
 	overlayDoc, err := overlay.ParseOverlay(overlayInput.Content)
+	h.instruments.recordPackageDuration(r.Context(), "overlay", overlayParseStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "OVERLAY_PARSE_FAILED",
 			fmt.Sprintf("failed to parse overlay document: %v", err))
@@ -62,14 +79,15 @@ func (h *Handler) handleOverlay(_ context.Context, req *builder.Request) builder
 
 	// Apply overlay using parse-once pattern
 	applier := overlay.NewApplier()
+	applyStart := time.Now()
 	applyResult, err := applier.ApplyParsed(parseResult, overlayDoc)
+	h.instruments.recordPackageDuration(r.Context(), "overlay", applyStart)
 	if err != nil {
 		return h.renderError(r, http.StatusUnprocessableEntity, "OVERLAY_FAILED",
 			fmt.Sprintf("overlay application failed: %v", err))
 	}
 
 	// Serialize result in original format
-	format := detectFormat(specInput.Content)
 	output, err := serializeDocument(applyResult.Document, format)
 	if err != nil {
 		slog.Error("failed to serialize overlay result",

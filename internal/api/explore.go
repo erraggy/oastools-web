@@ -95,27 +95,44 @@ func (h *Handler) handleExploreUpload(_ context.Context, req *builder.Request) b
 	// Compute SHA256 hash of content (first 16 chars)
 	hash := computeHash(input.Content)
 
-	// Check cache - if hit, return cached analysis
+	// Enrich metrics context
+	format := detectFormat(input.Content)
+	if ma := getMetricsAttrs(r.Context()); ma != nil {
+		ma.enrich("explore", format, len(input.Content))
+	}
+
+	// Check cache - if hit, return cached analysis (skip instrumentation)
 	if cached, ok := exploreCache.Get(hash); ok {
 		return h.renderExploreResult(r, cached)
 	}
 
 	// Parse spec using oastools
+	parseStart := time.Now()
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(input.Content))
+	h.instruments.recordPackageDuration(r.Context(), "parser", parseStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
 	}
 
+	// Record spec complexity
+	docStats := parser.GetDocumentStats(parseResult.Document)
+	h.instruments.recordSpecComplexity(r.Context(), "walker", parseResult.Version,
+		docStats.PathCount, docStats.OperationCount, docStats.SchemaCount, len(input.Content))
+
 	// Collect operations using walker
+	walkOpsStart := time.Now()
 	operations, err := walker.CollectOperations(parseResult)
+	h.instruments.recordPackageDuration(r.Context(), "walker", walkOpsStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "WALK_FAILED",
 			fmt.Sprintf("failed to collect operations: %v", err))
 	}
 
 	// Collect schemas using walker
+	walkSchemasStart := time.Now()
 	schemas, err := walker.CollectSchemas(parseResult)
+	h.instruments.recordPackageDuration(r.Context(), "walker", walkSchemasStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "WALK_FAILED",
 			fmt.Sprintf("failed to collect schemas: %v", err))

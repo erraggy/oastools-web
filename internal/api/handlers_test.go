@@ -105,6 +105,7 @@ func minimalHandler(t *testing.T) *Handler {
 			MaxFileSize: 2 << 20, // 2MB
 		},
 		partials:        partials,
+		instruments:     newInstruments(),
 		version:         "test-version",
 		oastoolsVersion: "test-oastools-version",
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/erraggy/oastools/builder"
 	"github.com/erraggy/oastools/fixer"
@@ -35,12 +36,25 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 		return errResp
 	}
 
+	// Enrich metrics context
+	format := detectFormat(input.Content)
+	if ma := getMetricsAttrs(r.Context()); ma != nil {
+		ma.enrich("fix", format, len(input.Content))
+	}
+
 	// Parse using oastools
+	parseStart := time.Now()
 	parseResult, err := parser.ParseWithOptions(parser.WithBytes(input.Content))
+	h.instruments.recordPackageDuration(r.Context(), "parser", parseStart)
 	if err != nil {
 		return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
 			fmt.Sprintf("failed to parse specification: %v", err))
 	}
+
+	// Record spec complexity
+	stats := parser.GetDocumentStats(parseResult.Document)
+	h.instruments.recordSpecComplexity(r.Context(), "fixer", parseResult.Version,
+		stats.PathCount, stats.OperationCount, stats.SchemaCount, len(input.Content))
 
 	// Configure fixer based on form options
 	f := fixer.New()
@@ -85,14 +99,15 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	}
 
 	// Fix using parse-once pattern
+	fixStart := time.Now()
 	fixResult, err := f.FixParsed(*parseResult)
+	h.instruments.recordPackageDuration(r.Context(), "fixer", fixStart)
 	if err != nil {
 		return h.renderError(r, http.StatusUnprocessableEntity, "FIX_FAILED",
 			fmt.Sprintf("fix operation failed: %v", err))
 	}
 
 	// Serialize result in original format
-	format := detectFormat(input.Content)
 	output, err := serializeDocument(fixResult.Document, format)
 	if err != nil {
 		slog.Error("failed to serialize fix result",
