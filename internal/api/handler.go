@@ -193,7 +193,9 @@ func (h *Handler) buildMiddlewareChain() {
 	handler = Recovery(handler)
 
 	// Metrics (records request duration, counts, errors)
-	handler = Metrics(h.instruments)(handler)
+	if h.cfg.MetricsEnabled {
+		handler = Metrics(h.instruments)(handler)
+	}
 
 	// Logging (outermost - logs everything including errors)
 	handler = Logging(handler)

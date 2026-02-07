@@ -90,13 +90,15 @@ func main() {
 // Monitoring via OTLP gRPC. On Cloud Run, ADC handles authentication automatically.
 func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterProvider, error) {
 	exporter, err := otlpmetricgrpc.New(ctx,
-		otlpmetricgrpc.WithEndpoint("telemetry.googleapis.com:443"),
+		otlpmetricgrpc.WithEndpointURL("https://telemetry.googleapis.com:443"),
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	res, err := resource.New(ctx,
+		resource.WithFromEnv(),
+		resource.WithTelemetrySDK(),
 		resource.WithAttributes(
 			semconv.ServiceName("oastools-web"),
 			semconv.ServiceVersion(appVersion),

@@ -101,7 +101,7 @@ metrics accurately attributes time to the specific library component.
 
 ### Middleware Chain Position
 
-```
+```text
 Logging → Metrics → Recovery → RateLimit → Concurrency → Timeout → SizeLimit → route
 ```
 

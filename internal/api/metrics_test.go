@@ -181,6 +181,12 @@ func TestOperationFromPath(t *testing.T) {
 }
 
 func TestMetrics_CapturesErrorStatus(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	prev := otel.GetMeterProvider()
+	otel.SetMeterProvider(mp)
+	t.Cleanup(func() { otel.SetMeterProvider(prev) })
+
 	inst := newInstruments()
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -195,5 +201,37 @@ func TestMetrics_CapturesErrorStatus(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("got status %d, want 400", rec.Code)
+	}
+
+	// Verify requestErrors counter was incremented
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(context.Background(), &rm); err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != "oastools.operation.errors" {
+				continue
+			}
+			sum, ok := m.Data.(metricdata.Sum[int64])
+			if !ok {
+				continue
+			}
+			for _, dp := range sum.DataPoints {
+				if dp.Value >= 1 {
+					found = true
+					if v, ok := dp.Attributes.Value(attribute.Key("error_code")); ok {
+						if v.AsInt64() != http.StatusBadRequest {
+							t.Errorf("error_code = %d, want %d", v.AsInt64(), http.StatusBadRequest)
+						}
+					}
+				}
+			}
+		}
+	}
+	if !found {
+		t.Error("requestErrors metric not recorded for 400 response")
 	}
 }
