@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -111,7 +112,13 @@ func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterPro
 		semconv.ServiceName("oastools-web"),
 		semconv.ServiceVersion(appVersion),
 	}
-	// telemetry.googleapis.com requires gcp.project_id in the OTel resource.
+	// telemetry.googleapis.com maps metrics to the prometheus_target monitored
+	// resource type which requires these OTel resource attributes:
+	//   instance  ← service.instance.id  (REQUIRED, rejected if empty)
+	//   location  ← cloud.region
+	//   cluster   ← cloud.platform (gcp_cloud_run → "__run__")
+	//   job       ← service.name (set above)
+	//   project_id ← gcp.project_id
 	// OnGCE() probes the metadata server on first call (has its own internal timeout).
 	if metadata.OnGCE() {
 		projectID, err := metadata.ProjectIDWithContext(ctx)
@@ -119,6 +126,31 @@ func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterPro
 			return nil, fmt.Errorf("fetching GCP project ID from metadata: %w", err)
 		}
 		attrs = append(attrs, attribute.String("gcp.project_id", projectID))
+
+		// instance label — required, metrics are rejected without it.
+		hostname, err := os.Hostname()
+		if err != nil {
+			return nil, fmt.Errorf("getting hostname for service instance ID: %w", err)
+		}
+		if hostname == "" {
+			return nil, fmt.Errorf("empty hostname for service instance ID")
+		}
+		attrs = append(attrs, semconv.ServiceInstanceID(hostname))
+
+		// cloud.platform → cluster label ("__run__" for Cloud Run)
+		if os.Getenv("K_SERVICE") != "" {
+			attrs = append(attrs, semconv.CloudPlatformGCPCloudRun)
+		}
+
+		// cloud.region → location label (avoids defaulting to "global")
+		// metadata returns "projects/NUM/regions/REGION"
+		if region, err := metadata.GetWithContext(ctx, "instance/region"); err == nil {
+			if i := strings.LastIndex(region, "/"); i >= 0 {
+				attrs = append(attrs, semconv.CloudRegion(region[i+1:]))
+			}
+		} else {
+			slog.Warn("failed to fetch cloud region from metadata", "error", err)
+		}
 	}
 
 	res, err := resource.New(ctx,
