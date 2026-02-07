@@ -37,18 +37,18 @@ func main() {
 	if cfg.MetricsEnabled {
 		mp, err := initMeterProvider(context.Background(), version)
 		if err != nil {
-			slog.Error("failed to init meter provider", "error", err)
-			os.Exit(1)
+			slog.Warn("metrics disabled: failed to init meter provider", "error", err)
+		} else {
+			otel.SetMeterProvider(mp)
+			defer func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := mp.Shutdown(ctx); err != nil {
+					slog.Error("meter provider shutdown error", "error", err)
+				}
+			}()
+			slog.Info("metrics enabled")
 		}
-		otel.SetMeterProvider(mp)
-		defer func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := mp.Shutdown(ctx); err != nil {
-				slog.Error("meter provider shutdown error", "error", err)
-			}
-		}()
-		slog.Info("metrics enabled")
 	}
 
 	handler, err := api.NewHandler(cfg, version)
@@ -90,9 +90,9 @@ func main() {
 }
 
 // initMeterProvider creates an OTel MeterProvider that exports to Google Cloud
-// Monitoring via OTLP gRPC. On Cloud Run, ADC handles authentication automatically.
+// Monitoring via OTLP gRPC. ADC credentials are attached via per-RPC gRPC credentials.
 func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterProvider, error) {
-	creds, err := oauth.NewApplicationDefault(ctx, "https://www.googleapis.com/auth/cloud-platform")
+	creds, err := oauth.NewApplicationDefault(ctx, "https://www.googleapis.com/auth/monitoring.write")
 	if err != nil {
 		return nil, fmt.Errorf("creating GCP credentials: %w", err)
 	}
@@ -102,7 +102,7 @@ func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterPro
 		otlpmetricgrpc.WithDialOption(grpc.WithPerRPCCredentials(creds)),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating OTLP exporter: %w", err)
 	}
 
 	res, err := resource.New(ctx,
@@ -114,7 +114,7 @@ func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterPro
 		),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating OTel resource: %w", err)
 	}
 
 	mp := metric.NewMeterProvider(
