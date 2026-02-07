@@ -132,10 +132,15 @@ func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterPro
 		if err != nil {
 			return nil, fmt.Errorf("getting hostname for service instance ID: %w", err)
 		}
+		if hostname == "" {
+			return nil, fmt.Errorf("empty hostname for service instance ID")
+		}
 		attrs = append(attrs, semconv.ServiceInstanceID(hostname))
 
 		// cloud.platform → cluster label ("__run__" for Cloud Run)
-		attrs = append(attrs, semconv.CloudPlatformGCPCloudRun)
+		if os.Getenv("K_SERVICE") != "" {
+			attrs = append(attrs, semconv.CloudPlatformGCPCloudRun)
+		}
 
 		// cloud.region → location label (avoids defaulting to "global")
 		// metadata returns "projects/NUM/regions/REGION"
@@ -143,6 +148,8 @@ func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterPro
 			if i := strings.LastIndex(region, "/"); i >= 0 {
 				attrs = append(attrs, semconv.CloudRegion(region[i+1:]))
 			}
+		} else {
+			slog.Warn("failed to fetch cloud region from metadata", "error", err)
 		}
 	}
 
