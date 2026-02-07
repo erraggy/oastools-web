@@ -13,7 +13,9 @@ import (
 	"github.com/erraggy/oastools-web/internal/api"
 	"github.com/erraggy/oastools-web/internal/config"
 
+	"cloud.google.com/go/compute/metadata"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -105,13 +107,21 @@ func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterPro
 		return nil, fmt.Errorf("creating OTLP exporter: %w", err)
 	}
 
+	attrs := []attribute.KeyValue{
+		semconv.ServiceName("oastools-web"),
+		semconv.ServiceVersion(appVersion),
+	}
+	// telemetry.googleapis.com requires gcp.project_id in the OTel resource.
+	if metadata.OnGCE() {
+		if projectID, err := metadata.ProjectIDWithContext(ctx); err == nil {
+			attrs = append(attrs, attribute.String("gcp.project_id", projectID))
+		}
+	}
+
 	res, err := resource.New(ctx,
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
-		resource.WithAttributes(
-			semconv.ServiceName("oastools-web"),
-			semconv.ServiceVersion(appVersion),
-		),
+		resource.WithAttributes(attrs...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating OTel resource: %w", err)
