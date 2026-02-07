@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,6 +18,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/oauth"
 )
 
 var version = "dev"
@@ -89,8 +92,14 @@ func main() {
 // initMeterProvider creates an OTel MeterProvider that exports to Google Cloud
 // Monitoring via OTLP gRPC. On Cloud Run, ADC handles authentication automatically.
 func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterProvider, error) {
+	creds, err := oauth.NewApplicationDefault(ctx, "https://www.googleapis.com/auth/cloud-platform")
+	if err != nil {
+		return nil, fmt.Errorf("creating GCP credentials: %w", err)
+	}
+
 	exporter, err := otlpmetricgrpc.New(ctx,
 		otlpmetricgrpc.WithEndpointURL("https://telemetry.googleapis.com:443"),
+		otlpmetricgrpc.WithDialOption(grpc.WithPerRPCCredentials(creds)),
 	)
 	if err != nil {
 		return nil, err
