@@ -112,10 +112,13 @@ func initMeterProvider(ctx context.Context, appVersion string) (*metric.MeterPro
 		semconv.ServiceVersion(appVersion),
 	}
 	// telemetry.googleapis.com requires gcp.project_id in the OTel resource.
+	// OnGCE() probes the metadata server on first call (has its own internal timeout).
 	if metadata.OnGCE() {
-		if projectID, err := metadata.ProjectIDWithContext(ctx); err == nil {
-			attrs = append(attrs, attribute.String("gcp.project_id", projectID))
+		projectID, err := metadata.ProjectIDWithContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("fetching GCP project ID from metadata: %w", err)
 		}
+		attrs = append(attrs, attribute.String("gcp.project_id", projectID))
 	}
 
 	res, err := resource.New(ctx,
