@@ -81,6 +81,7 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	// If checkboxes selected, use only those fix types; otherwise nil enables all
 	if len(enabledFixes) > 0 {
 		f.EnabledFixes = enabledFixes
+		f.MutableInput = true // there's no need to copy the input document
 	}
 
 	// Fix using parse-once pattern
