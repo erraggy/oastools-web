@@ -1,9 +1,15 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
 func TestMetrics_SkipsStaticFiles(t *testing.T) {
@@ -75,11 +81,6 @@ func TestMetrics_SetsContextAttrs(t *testing.T) {
 }
 
 func TestMetrics_DetectsSource(t *testing.T) {
-	// This test verifies that the middleware correctly identifies UI vs API requests.
-	// We can't directly observe the recorded metric attributes without a ManualReader,
-	// but we verify the logic by checking the HX-Request header detection path.
-	inst := newInstruments()
-
 	tests := []struct {
 		name       string
 		hxRequest  string
@@ -91,6 +92,14 @@ func TestMetrics_DetectsSource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Wire up a ManualReader so we can inspect recorded attributes
+			reader := sdkmetric.NewManualReader()
+			mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+			prev := otel.GetMeterProvider()
+			otel.SetMeterProvider(mp)
+			t.Cleanup(func() { otel.SetMeterProvider(prev) })
+
+			inst := newInstruments()
 			inner, called := testHandler()
 			wrapped := Metrics(inst)(inner)
 
@@ -103,6 +112,36 @@ func TestMetrics_DetectsSource(t *testing.T) {
 
 			if !*called {
 				t.Error("handler should have been called")
+			}
+
+			// Collect and inspect the recorded metrics
+			var rm metricdata.ResourceMetrics
+			if err := reader.Collect(context.Background(), &rm); err != nil {
+				t.Fatal(err)
+			}
+
+			found := false
+			for _, sm := range rm.ScopeMetrics {
+				for _, m := range sm.Metrics {
+					if m.Name != "oastools.operation.count" {
+						continue
+					}
+					sum, ok := m.Data.(metricdata.Sum[int64])
+					if !ok {
+						continue
+					}
+					for _, dp := range sum.DataPoints {
+						if v, ok := dp.Attributes.Value(attribute.Key("source")); ok {
+							found = true
+							if v.AsString() != tt.wantSource {
+								t.Errorf("source = %q, want %q", v.AsString(), tt.wantSource)
+							}
+						}
+					}
+				}
+			}
+			if !found {
+				t.Error("source attribute not found in recorded metrics")
 			}
 		})
 	}
@@ -127,6 +166,7 @@ func TestOperationFromPath(t *testing.T) {
 		{"/health", "unknown"},
 		{"/static/style.css", "unknown"},
 		{"/api/", "unknown"},
+		{"/api/nonexistent", "unknown"},
 		{"", "unknown"},
 	}
 

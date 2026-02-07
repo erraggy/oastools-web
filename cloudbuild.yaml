@@ -58,7 +58,7 @@ steps:
       - '--concurrency'
       - '80'
       - '--allow-unauthenticated'
-      - '--set-env-vars'
+      - '--update-env-vars'
       - 'METRICS_ENABLED=true'
 
 images:

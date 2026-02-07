@@ -29,6 +29,8 @@ func main() {
 	}))
 	slog.SetDefault(logger)
 
+	// MeterProvider must be set before NewHandler, which calls otel.Meter()
+	// to create instruments. When disabled, the default no-op provider is used.
 	if cfg.MetricsEnabled {
 		mp, err := initMeterProvider(context.Background(), version)
 		if err != nil {

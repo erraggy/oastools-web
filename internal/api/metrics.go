@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -59,31 +60,46 @@ type instruments struct {
 func newInstruments() *instruments {
 	meter := otel.Meter("oastools-web")
 
+	logErr := func(name string, err error) {
+		if err != nil {
+			slog.Warn("failed to create metric instrument", "name", name, "error", err)
+		}
+	}
+
 	// Tier 1 instruments
-	requestDuration, _ := meter.Float64Histogram("oastools.operation.duration",
+	requestDuration, err := meter.Float64Histogram("oastools.operation.duration",
 		metric.WithDescription("Total request duration for API operations"),
 		metric.WithUnit("s"))
-	requestCount, _ := meter.Int64Counter("oastools.operation.count",
+	logErr("oastools.operation.duration", err)
+	requestCount, err := meter.Int64Counter("oastools.operation.count",
 		metric.WithDescription("Total operations processed"))
-	requestErrors, _ := meter.Int64Counter("oastools.operation.errors",
+	logErr("oastools.operation.count", err)
+	requestErrors, err := meter.Int64Counter("oastools.operation.errors",
 		metric.WithDescription("Error count by type"))
-	inputSize, _ := meter.Int64Histogram("oastools.operation.input_size",
+	logErr("oastools.operation.errors", err)
+	inputSize, err := meter.Int64Histogram("oastools.operation.input_size",
 		metric.WithDescription("Input file size in bytes"),
 		metric.WithUnit("By"))
+	logErr("oastools.operation.input_size", err)
 
 	// Tier 2 instruments
-	packageDuration, _ := meter.Float64Histogram("oastools.package.duration",
+	packageDuration, err := meter.Float64Histogram("oastools.package.duration",
 		metric.WithDescription("Time spent inside an oastools package call"),
 		metric.WithUnit("s"))
-	specPaths, _ := meter.Int64Histogram("oastools.spec.paths",
+	logErr("oastools.package.duration", err)
+	specPaths, err := meter.Int64Histogram("oastools.spec.paths",
 		metric.WithDescription("Path count from parsed spec"))
-	specOperations, _ := meter.Int64Histogram("oastools.spec.operations",
+	logErr("oastools.spec.paths", err)
+	specOperations, err := meter.Int64Histogram("oastools.spec.operations",
 		metric.WithDescription("Operation count from parsed spec"))
-	specSchemas, _ := meter.Int64Histogram("oastools.spec.schemas",
+	logErr("oastools.spec.operations", err)
+	specSchemas, err := meter.Int64Histogram("oastools.spec.schemas",
 		metric.WithDescription("Schema count from parsed spec"))
-	specInputBytes, _ := meter.Int64Histogram("oastools.spec.input_bytes",
+	logErr("oastools.spec.schemas", err)
+	specInputBytes, err := meter.Int64Histogram("oastools.spec.input_bytes",
 		metric.WithDescription("Raw input size in bytes"),
 		metric.WithUnit("By"))
+	logErr("oastools.spec.input_bytes", err)
 
 	return &instruments{
 		requestDuration: requestDuration,
@@ -169,8 +185,17 @@ func Metrics(inst *instruments) func(http.Handler) http.Handler {
 	}
 }
 
+// knownOps is the allowlist of valid operation names to prevent unbounded
+// metric cardinality from arbitrary /api/<path> requests.
+var knownOps = map[string]bool{
+	"validate": true, "convert": true, "diff": true,
+	"fix": true, "join": true, "overlay": true,
+	"explore": true, "spec": true,
+}
+
 // operationFromPath extracts the operation name from a URL path.
 // e.g., "/api/validate" -> "validate", "/api/explore/operations" -> "explore"
+// Returns "unknown" for paths not in the knownOps allowlist.
 func operationFromPath(path string) string {
 	trimmed := strings.TrimPrefix(path, "/api/")
 	if trimmed == path {
@@ -179,7 +204,7 @@ func operationFromPath(path string) string {
 	if idx := strings.Index(trimmed, "/"); idx != -1 {
 		trimmed = trimmed[:idx]
 	}
-	if trimmed == "" {
+	if !knownOps[trimmed] {
 		return "unknown"
 	}
 	return trimmed

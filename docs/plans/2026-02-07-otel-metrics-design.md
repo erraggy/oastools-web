@@ -150,7 +150,7 @@ attrs := getMetricAttrs(r)
 
 | Env Var | Default | Description |
 |---|---|---|
-| `METRICS_ENABLED` | `true` | Enable/disable metrics export |
+| `METRICS_ENABLED` | `false` | Enable/disable metrics export |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `telemetry.googleapis.com:443` | OTLP gRPC endpoint |
 
 ### Local Development
