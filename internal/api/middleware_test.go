@@ -677,10 +677,10 @@ func TestSecurityHeaders(t *testing.T) {
 	csp := rec.Header().Get("Content-Security-Policy")
 	for _, directive := range []string{
 		"default-src 'self'",
-		"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com",
-		"style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com",
+		"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com https://cdn.jsdelivr.net",
+		"style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com https://cdn.jsdelivr.net",
 		"img-src 'self' data:",
-		"connect-src 'self' https://raw.githubusercontent.com",
+		"connect-src 'self' https://raw.githubusercontent.com https://cdn.jsdelivr.net",
 		"frame-src 'none'",
 		"object-src 'none'",
 		"base-uri 'self'",
