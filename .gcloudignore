@@ -1,0 +1,39 @@
+# Files not uploaded to Cloud Build via gcloud builds submit.
+# This overrides the default behavior of inheriting .gitignore patterns,
+# which incorrectly excludes cmd/server/ (matched by the "server" pattern
+# meant for the compiled binary).
+
+.gcloudignore
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Claude Code local config
+.claude.local.md
+
+# Go workspace files (local development only)
+go.work
+go.work.sum
+
+# Build artifacts (root binary only, not cmd/server/)
+/server
+bin/
+
+# Node.js / Playwright
+node_modules/
+test-results/
+playwright-report/
+
+# Git worktrees
+.worktrees/
+
+# Other non-source files
+.DS_Store
+.conductor/
+e2e/
+docs/
+*.md
