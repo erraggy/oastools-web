@@ -1,13 +1,18 @@
 steps:
-  # Get version from git describe (unshallow and fetch tags since Cloud Build uses shallow clone)
+  # Get version from substitution or git describe
   - name: 'gcr.io/cloud-builders/git'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        git fetch --unshallow --tags 2>/dev/null || git fetch --tags
-        APP_VERSION=$$(git describe --tags --always)
-        echo "Detected version: $$APP_VERSION"
+        if [ -n "${_APP_VERSION}" ]; then
+          APP_VERSION="${_APP_VERSION}"
+          echo "Using substitution version: $$APP_VERSION"
+        else
+          git fetch --unshallow --tags 2>/dev/null || git fetch --tags
+          APP_VERSION=$$(git describe --tags --always)
+          echo "Detected version: $$APP_VERSION"
+        fi
         echo "$$APP_VERSION" > /workspace/version.txt
 
   # Build the container image
@@ -64,6 +69,9 @@ steps:
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:$SHORT_SHA'
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/oastools-web/server:latest'
+
+substitutions:
+  _APP_VERSION: ''
 
 options:
   defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
