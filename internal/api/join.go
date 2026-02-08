@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -36,54 +36,33 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 			fmt.Sprintf("failed to parse form: %v", err))
 	}
 
-	// Get all spec files
-	files := r.MultipartForm.File["specs"]
-	if len(files) < 2 {
-		return h.renderError(r, http.StatusBadRequest, "INSUFFICIENT_FILES",
-			"at least 2 specification files are required")
-	}
-	if len(files) > 5 {
-		return h.renderError(r, http.StatusBadRequest, "TOO_MANY_FILES",
-			"maximum 5 specification files allowed")
+	// Read all spec inputs (file or paste mode)
+	sources, errResp := h.readMultipleInputs(r, "specs", maxJoinFileSize, 2, 5)
+	if errResp != nil {
+		return errResp
 	}
 
 	// Parse all specifications
-	parseResults := make([]parser.ParseResult, 0, len(files))
+	parseResults := make([]parser.ParseResult, 0, len(sources))
 	var firstFormat string
 	var totalInputBytes int
-	for i, fileHeader := range files {
-		file, err := fileHeader.Open()
-		if err != nil {
-			return h.renderError(r, http.StatusBadRequest, "FILE_OPEN_FAILED",
-				fmt.Sprintf("failed to open file %s: %v", fileHeader.Filename, err))
-		}
+	for i, src := range sources {
+		totalInputBytes += len(src.Content)
 
-		content, err := io.ReadAll(file)
-		_ = file.Close()
-		if err != nil {
-			return h.renderError(r, http.StatusBadRequest, "READ_FAILED",
-				fmt.Sprintf("failed to read file %s: %v", fileHeader.Filename, err))
-		}
-
-		// Validate per-file size limit (1MB)
-		if len(content) > maxJoinFileSize {
-			return h.renderError(r, http.StatusBadRequest, "FILE_TOO_LARGE",
-				fmt.Sprintf("file %s exceeds 1MB limit", fileHeader.Filename))
-		}
-
-		totalInputBytes += len(content)
-
-		// Track format from first file
+		// Track format from first input
 		if i == 0 {
-			firstFormat = detectFormat(content)
+			firstFormat = detectFormat(src.Content)
 		}
 
 		parseStart := time.Now()
-		parseResult, err := parser.ParseWithOptions(parser.WithBytes(content))
+		parseResult, err := parser.ParseWithOptions(
+			parser.WithBytes(src.Content),
+			parser.WithSourceName(src.Filename),
+		)
 		h.instruments.recordPackageDuration(r.Context(), "parser", parseStart)
 		if err != nil {
 			return h.renderError(r, http.StatusBadRequest, "PARSE_FAILED",
-				fmt.Sprintf("failed to parse %s: %v", fileHeader.Filename, err))
+				fmt.Sprintf("failed to parse %s: %v", src.Filename, err))
 		}
 		parseResults = append(parseResults, *parseResult)
 	}
@@ -104,14 +83,35 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 	config := joiner.DefaultConfig()
 	config.DefaultStrategy = parseCollisionStrategy(r.FormValue("strategy"))
 
+	// Apply advanced options when specified (empty means "same as default")
+	if ps := r.FormValue("pathStrategy"); ps != "" {
+		config.PathStrategy = parseCollisionStrategy(ps)
+	}
+	if ss := r.FormValue("schemaStrategy"); ss != "" {
+		config.SchemaStrategy = parseSchemaStrategy(ss)
+	}
+	if em := r.FormValue("equivalenceMode"); em != "" {
+		if !joiner.IsValidEquivalenceMode(em) {
+			return h.renderError(r, http.StatusBadRequest, "INVALID_EQUIVALENCE_MODE",
+				fmt.Sprintf("invalid equivalence mode: %s", em))
+		}
+		config.EquivalenceMode = em
+	} else if config.SchemaStrategy == joiner.StrategyDeduplicateEquivalent {
+		config.EquivalenceMode = string(joiner.EquivalenceModeDeep)
+	}
+	if r.FormValue("semanticDedup") == "on" {
+		config.SemanticDeduplication = true
+	}
+
 	// Join using parse-once pattern
 	j := joiner.New(config)
 	joinStart := time.Now()
 	joinResult, err := j.JoinParsed(parseResults)
 	h.instruments.recordPackageDuration(r.Context(), "joiner", joinStart)
 	if err != nil {
+		slog.Warn("join operation failed", "error", err.Error())
 		return h.renderError(r, http.StatusUnprocessableEntity, "JOIN_FAILED",
-			fmt.Sprintf("join operation failed: %v", err))
+			formatJoinError(err))
 	}
 
 	// Serialize result in first file's format
@@ -147,6 +147,45 @@ func parseCollisionStrategy(s string) joiner.CollisionStrategy {
 	default:
 		return joiner.StrategyRenameRight // Default: keep left, rename right
 	}
+}
+
+// parseSchemaStrategy maps form values to joiner strategies for schemas.
+// This extends parseCollisionStrategy with "deduplicate" which only applies to schemas.
+func parseSchemaStrategy(s string) joiner.CollisionStrategy {
+	if s == "deduplicate" {
+		return joiner.StrategyDeduplicateEquivalent
+	}
+	return parseCollisionStrategy(s)
+}
+
+// formatJoinError rewrites joiner errors into user-friendly messages.
+// For CollisionError instances, the joiner library produces CLI-oriented messages
+// (e.g., "set --path-strategy to 'accept-left'") that reference flags and internal
+// strategy names. This translates them for the web UI. Other error types pass
+// through with a generic prefix.
+func formatJoinError(err error) string {
+	var ce *joiner.CollisionError
+	if !errors.As(err, &ce) {
+		return fmt.Sprintf("join operation failed: %v", err)
+	}
+
+	// Map internal strategy names to UI labels
+	strategyLabel := map[joiner.CollisionStrategy]string{
+		joiner.StrategyFailOnCollision:       "Error",
+		joiner.StrategyAcceptLeft:            "First",
+		joiner.StrategyRenameRight:           "Rename",
+		joiner.StrategyDeduplicateEquivalent: "Deduplicate",
+	}
+
+	strategy := "Error"
+	if label, ok := strategyLabel[ce.Strategy]; ok {
+		strategy = label
+	}
+
+	return fmt.Sprintf("Collision in %s: '%s' is defined in both %s and %s. "+
+		"Current strategy: %s. Change the Collision Strategy to \"First\" (keep first occurrence) "+
+		"or \"Rename\" (append suffix to duplicates) to resolve.",
+		ce.Section, ce.Key, ce.FirstFile, ce.SecondFile, strategy)
 }
 
 func (h *Handler) buildJoinResponse(parseResults []parser.ParseResult, joinResult *joiner.JoinResult, output, format string) JoinResponse {

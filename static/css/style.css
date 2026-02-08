@@ -1419,6 +1419,75 @@ small {
     font-size: 0.8125rem;
 }
 
+/* Join paste mode: multi-spec container */
+.specs-paste-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.spec-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.spec-slot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.spec-slot-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+.btn-remove-spec {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-error);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-remove-spec:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-error) 10%, transparent);
+    border-color: var(--color-error);
+}
+
+.btn-remove-spec:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.btn-add-spec {
+    background: transparent;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.5rem;
+    width: 100%;
+    font-size: 0.875rem;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    margin-top: 0.5rem;
+}
+
+.btn-add-spec:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+    border-color: var(--color-primary);
+}
+
+.btn-add-spec:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
 /* Hidden utility */
 .hidden {
     display: none !important;

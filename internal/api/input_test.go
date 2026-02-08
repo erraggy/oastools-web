@@ -2,9 +2,11 @@ package api
 
 import (
 	"bytes"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -292,4 +294,294 @@ func TestHandler_readInputWithLimit_InvalidMode(t *testing.T) {
 	if errResp == nil {
 		t.Fatal("expected error response for invalid mode")
 	}
+}
+
+// =============================================================================
+// readMultipleInputs Tests
+// =============================================================================
+
+// createMultiValueFormRequest creates a form request supporting repeated field names.
+func createMultiValueFormRequest(t *testing.T, values url.Values) *http.Request {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(values.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
+}
+
+func TestHandler_readMultipleInputs_ModeDispatch(t *testing.T) {
+	h := &Handler{cfg: &config.Config{MaxFileSize: 1024}}
+
+	t.Run("defaults to file mode", func(t *testing.T) {
+		// No input_mode field → file mode → FORM_NOT_PARSED (no multipart form)
+		req := createFormRequest(t, map[string]string{})
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+		_, errResp := h.readMultipleInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error response")
+		}
+	})
+
+	t.Run("paste mode routes to paste handler", func(t *testing.T) {
+		form := url.Values{}
+		form.Set("input_mode", "paste")
+		form.Add("specs_content", "spec one")
+		form.Add("specs_content", "spec two")
+
+		req := createMultiValueFormRequest(t, form)
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		sources, errResp := h.readMultipleInputs(req, "specs", 1024, 2, 5)
+		if errResp != nil {
+			t.Fatalf("unexpected error: %v", errResp.Body())
+		}
+		if len(sources) != 2 {
+			t.Errorf("expected 2 sources, got %d", len(sources))
+		}
+		if sources[0].Mode != "paste" {
+			t.Errorf("expected paste mode, got %q", sources[0].Mode)
+		}
+	})
+
+	t.Run("url mode returns unsupported error", func(t *testing.T) {
+		req := createFormRequest(t, map[string]string{
+			"input_mode": "url",
+		})
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultipleInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error response for unsupported mode")
+		}
+	})
+
+	t.Run("invalid mode returns error", func(t *testing.T) {
+		req := createFormRequest(t, map[string]string{
+			"input_mode": "bogus",
+		})
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultipleInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error response for invalid mode")
+		}
+	})
+}
+
+// =============================================================================
+// readMultipleFileInputs Tests
+// =============================================================================
+
+func TestHandler_readMultipleFileInputs(t *testing.T) {
+	h := &Handler{cfg: &config.Config{MaxFileSize: 1024}}
+
+	t.Run("valid files", func(t *testing.T) {
+		files := [][]byte{[]byte("spec one"), []byte("spec two")}
+		req := createMultiFileRequest(t, "/test", "specs", files, nil)
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		sources, errResp := h.readMultipleFileInputs(req, "specs", 1024, 2, 5)
+		if errResp != nil {
+			t.Fatalf("unexpected error: %v", errResp.Body())
+		}
+		if len(sources) != 2 {
+			t.Errorf("expected 2 sources, got %d", len(sources))
+		}
+		for _, s := range sources {
+			if s.Mode != "file" {
+				t.Errorf("expected file mode, got %q", s.Mode)
+			}
+		}
+	})
+
+	t.Run("nil MultipartForm returns error", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/test", nil)
+		_, errResp := h.readMultipleFileInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for nil MultipartForm")
+		}
+	})
+
+	t.Run("too few files", func(t *testing.T) {
+		files := [][]byte{[]byte("only one")}
+		req := createMultiFileRequest(t, "/test", "specs", files, nil)
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultipleFileInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for too few files")
+		}
+	})
+
+	t.Run("too many files", func(t *testing.T) {
+		files := make([][]byte, 6)
+		for i := range files {
+			files[i] = []byte(fmt.Sprintf("spec %d", i))
+		}
+		req := createMultiFileRequest(t, "/test", "files", files, nil)
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultipleFileInputs(req, "files", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for too many files")
+		}
+	})
+
+	t.Run("empty file", func(t *testing.T) {
+		files := [][]byte{[]byte("valid spec"), {}}
+		req := createMultiFileRequest(t, "/test", "specs", files, nil)
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultipleFileInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for empty file")
+		}
+	})
+
+	t.Run("file exceeds size limit", func(t *testing.T) {
+		files := [][]byte{[]byte("small"), bytes.Repeat([]byte("x"), 2000)}
+		req := createMultiFileRequest(t, "/test", "specs", files, nil)
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultipleFileInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for oversized file")
+		}
+	})
+}
+
+// =============================================================================
+// readMultiplePasteInputs Tests
+// =============================================================================
+
+func TestHandler_readMultiplePasteInputs(t *testing.T) {
+	h := &Handler{cfg: &config.Config{MaxFileSize: 1024}}
+
+	t.Run("valid pastes", func(t *testing.T) {
+		form := url.Values{}
+		form.Add("specs_content", "spec one")
+		form.Add("specs_content", "spec two")
+
+		req := createMultiValueFormRequest(t, form)
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		sources, errResp := h.readMultiplePasteInputs(req, "specs", 1024, 2, 5)
+		if errResp != nil {
+			t.Fatalf("unexpected error: %v", errResp.Body())
+		}
+		if len(sources) != 2 {
+			t.Errorf("expected 2 sources, got %d", len(sources))
+		}
+		if string(sources[0].Content) != "spec one" {
+			t.Errorf("unexpected content: %q", sources[0].Content)
+		}
+		if sources[0].Filename != "pasted-spec-1" {
+			t.Errorf("expected filename pasted-spec-1, got %q", sources[0].Filename)
+		}
+		if sources[1].Mode != "paste" {
+			t.Errorf("expected paste mode, got %q", sources[1].Mode)
+		}
+	})
+
+	t.Run("filters empty values", func(t *testing.T) {
+		form := url.Values{}
+		form.Add("specs_content", "spec one")
+		form.Add("specs_content", "")
+		form.Add("specs_content", "   ")
+		form.Add("specs_content", "spec two")
+
+		req := createMultiValueFormRequest(t, form)
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		sources, errResp := h.readMultiplePasteInputs(req, "specs", 1024, 2, 5)
+		if errResp != nil {
+			t.Fatalf("unexpected error: %v", errResp.Body())
+		}
+		if len(sources) != 2 {
+			t.Errorf("expected 2 sources after filtering, got %d", len(sources))
+		}
+	})
+
+	t.Run("too few after filtering", func(t *testing.T) {
+		form := url.Values{}
+		form.Add("specs_content", "only one")
+		form.Add("specs_content", "")
+
+		req := createMultiValueFormRequest(t, form)
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultiplePasteInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for insufficient specs after filtering")
+		}
+	})
+
+	t.Run("too many pastes", func(t *testing.T) {
+		form := url.Values{}
+		for i := 0; i < 6; i++ {
+			form.Add("specs_content", fmt.Sprintf("spec %d", i))
+		}
+
+		req := createMultiValueFormRequest(t, form)
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultiplePasteInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for too many specs")
+		}
+	})
+
+	t.Run("paste exceeds size limit", func(t *testing.T) {
+		form := url.Values{}
+		form.Add("specs_content", "small")
+		form.Add("specs_content", strings.Repeat("x", 2000))
+
+		req := createMultiValueFormRequest(t, form)
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultiplePasteInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for oversized paste")
+		}
+	})
+
+	t.Run("no values submitted", func(t *testing.T) {
+		form := url.Values{}
+		req := createMultiValueFormRequest(t, form)
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultiplePasteInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error for no specs")
+		}
+	})
 }
