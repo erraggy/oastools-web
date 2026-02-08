@@ -108,7 +108,7 @@ Environment variables:
 
 ## Deployment
 
-The app deploys to Cloud Run via Cloud Build trigger on main branch:
+The app deploys to Cloud Run via Cloud Build trigger on version tags (`v*.*.*`):
 ```bash
 gcloud run deploy oastools-web \
     --region us-central1 \
@@ -116,6 +116,8 @@ gcloud run deploy oastools-web \
     --max-instances 2 \
     --min-instances 0
 ```
+
+Automated oastools dependency updates are deployed directly via `gcloud builds submit` from the `update-oastools.yml` GitHub Actions workflow (no version tag needed).
 
 Rollback: `gcloud run services update-traffic oastools-web --to-revisions=<revision>=100`
 
