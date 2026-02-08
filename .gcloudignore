@@ -36,4 +36,3 @@ playwright-report/
 .conductor/
 e2e/
 docs/
-*.md
