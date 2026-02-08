@@ -98,11 +98,13 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 		},
 		// emgithubURL builds an emgithub embed script URL for a source file,
 		// pinned to the deployed version tag. Returns empty for non-release builds.
+		// Pass exactly 2 line numbers for a range (e.g., 109, 166); other counts are ignored.
 		"emgithubURL": func(filePath string, lines ...int) template.URL {
-			if version == "dev" || strings.Contains(version, "-") {
+			v := strings.TrimSpace(version)
+			if v == "" || v == "dev" || strings.Contains(v, "-") {
 				return ""
 			}
-			ghURL := fmt.Sprintf("https://github.com/erraggy/oastools-web/blob/%s/%s", version, filePath)
+			ghURL := fmt.Sprintf("https://github.com/erraggy/oastools-web/blob/%s/%s", v, filePath)
 			if len(lines) == 2 {
 				ghURL += fmt.Sprintf("#L%d-L%d", lines[0], lines[1])
 			}

@@ -587,7 +587,6 @@ details.usage-docs[open] summary {
 
 .docs-content {
     padding: 1rem;
-    overflow-x: auto;
 }
 
 .docs-content .emgithub-container {

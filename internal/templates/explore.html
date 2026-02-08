@@ -62,6 +62,7 @@
     <details class="usage-docs">
         <summary>How it's done</summary>
         <div class="docs-content">
+            {{/* Line range covers the core parse + walker.Collect* block. Update when explore.go changes. */}}
             {{with emgithubURL "internal/api/explore.go" 109 166}}
             <script src="{{.}}"></script>
             {{end}}
