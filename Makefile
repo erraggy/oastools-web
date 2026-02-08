@@ -51,7 +51,7 @@ lint-css:
 lint-js:
 	@echo "Running JS linter..."
 	@npx eslint "static/js/**/*.js" --no-config-lookup \
-		--rule 'no-unused-vars: [warn, {varsIgnorePattern: "^(switchInputMode|copyToClipboard|downloadAsFile|addFileInput|removeFileInput|loadExample|loadJoinExample)$$"}]' \
+		--rule 'no-unused-vars: [warn, {varsIgnorePattern: "^(switchInputMode|copyToClipboard|downloadAsFile|addJoinSpec|removeJoinSpec|updateJoinSpecState|loadExample|loadJoinExample)$$"}]' \
 		--rule 'no-undef: off' 2>/dev/null || true
 .PHONY: lint-js
 

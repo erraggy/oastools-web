@@ -12,8 +12,8 @@
           hx-indicator="#spinner"
           hx-swap="innerHTML"
           enctype="multipart/form-data">
-        <div class="form-group">
-            <label for="specs">Specification Files (2-5 files)</label>
+        <div class="input-section" data-field="specs">
+            <label>Specification Files (2-5 specs)</label>
             <div class="example-picker">
                 <select onchange="loadJoinExample(this)">
                     <option value="">Add Example...</option>
@@ -23,8 +23,35 @@
                     <option value="inventory-api">Inventory API (Conflicts)</option>
                 </select>
             </div>
-            <input type="file" id="specs" name="specs" accept=".json,.yaml,.yml" multiple required>
-            <small>Select 2-5 JSON or YAML files (max 1MB each)</small>
+            <div class="input-tabs">
+                <button type="button" class="input-tab active" data-mode="file" onclick="switchInputMode(this.closest('.input-section'), 'file')">Upload Files</button>
+                <button type="button" class="input-tab" data-mode="paste" onclick="switchInputMode(this.closest('.input-section'), 'paste')">Paste Content</button>
+            </div>
+            <div class="input-content" data-mode="file">
+                <input type="file" id="specs" name="specs" accept=".json,.yaml,.yml" multiple data-required="true" required>
+                <small>Select 2-5 JSON or YAML files (max 1MB each)</small>
+            </div>
+            <div class="input-content hidden" data-mode="paste">
+                <div class="specs-paste-container">
+                    <div class="spec-slot">
+                        <div class="spec-slot-header">
+                            <span class="spec-slot-label">Spec 1</span>
+                            <button type="button" class="btn-remove-spec" onclick="removeJoinSpec(this)" disabled>Remove</button>
+                        </div>
+                        <textarea name="specs_content" rows="8" placeholder="Paste OpenAPI spec (JSON or YAML)..." disabled></textarea>
+                    </div>
+                    <div class="spec-slot">
+                        <div class="spec-slot-header">
+                            <span class="spec-slot-label">Spec 2</span>
+                            <button type="button" class="btn-remove-spec" onclick="removeJoinSpec(this)" disabled>Remove</button>
+                        </div>
+                        <textarea name="specs_content" rows="8" placeholder="Paste OpenAPI spec (JSON or YAML)..." disabled></textarea>
+                    </div>
+                </div>
+                <button type="button" class="btn-add-spec" onclick="addJoinSpec(this.closest('.input-content').querySelector('.specs-paste-container'))">+ Add Spec</button>
+                <small>Paste 2-5 specs (max 1MB each)</small>
+            </div>
+            <input type="hidden" name="input_mode" value="file">
         </div>
 
         <div class="form-group">
@@ -56,6 +83,15 @@
                         <option value="rename">Rename (suffix duplicates)</option>
                         <option value="deduplicate">Deduplicate (merge identical)</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label for="equivalenceMode">Equivalence Mode</label>
+                    <select id="equivalenceMode" name="equivalenceMode">
+                        <option value="" selected>Default (deep when deduplicating)</option>
+                        <option value="shallow">Shallow (top-level properties only)</option>
+                        <option value="deep">Deep (full recursive comparison)</option>
+                    </select>
+                    <small>Depth of schema comparison for deduplication</small>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">

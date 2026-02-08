@@ -1,3 +1,12 @@
+// Allow HTMX to swap error responses (4xx/5xx) so users see error messages
+document.addEventListener('htmx:beforeSwap', (evt) => {
+    const status = evt.detail.xhr.status;
+    if (status >= 400) {
+        evt.detail.shouldSwap = true;
+        evt.detail.isError = false;
+    }
+});
+
 // Re-highlight code blocks after HTMX swaps in new content
 document.addEventListener('htmx:afterSwap', (evt) => {
     if (typeof hljs !== 'undefined') {
@@ -73,29 +82,53 @@ function downloadAsFile(content, filename, mimeType) {
     URL.revokeObjectURL(url);
 }
 
-// Add file input for join operation
-function addFileInput(container) {
-    const inputs = container.querySelectorAll('input[type="file"]');
-    if (inputs.length >= 5) {
-        return; // Max 5 files
-    }
+// Add a spec textarea to the join paste container
+function addJoinSpec(container, content) {
+    const slots = container.querySelectorAll('.spec-slot');
+    if (slots.length >= 5) return;
 
+    const index = slots.length + 1;
     const div = document.createElement('div');
-    div.className = 'form-group';
+    div.className = 'spec-slot';
     div.innerHTML = `
-        <input type="file" name="spec[]" accept=".json,.yaml,.yml" required>
-        <button type="button" class="btn-remove" onclick="removeFileInput(this)">Remove</button>
+        <div class="spec-slot-header">
+            <span class="spec-slot-label">Spec ${index}</span>
+            <button type="button" class="btn-remove-spec" onclick="removeJoinSpec(this)">Remove</button>
+        </div>
+        <textarea name="specs_content" rows="8" placeholder="Paste OpenAPI spec (JSON or YAML)...">${content || ''}</textarea>
     `;
     container.appendChild(div);
+    updateJoinSpecState(container);
 }
 
-// Remove file input
-function removeFileInput(button) {
-    const container = button.closest('.file-inputs');
-    const inputs = container.querySelectorAll('input[type="file"]');
-    if (inputs.length > 2) {
-        button.parentElement.remove();
-    }
+// Remove a spec textarea from the join paste container
+function removeJoinSpec(button) {
+    const container = button.closest('.specs-paste-container');
+    const slots = container.querySelectorAll('.spec-slot');
+    if (slots.length <= 2) return;
+
+    button.closest('.spec-slot').remove();
+    // Renumber remaining slots
+    container.querySelectorAll('.spec-slot').forEach((slot, i) => {
+        slot.querySelector('.spec-slot-label').textContent = `Spec ${i + 1}`;
+    });
+    updateJoinSpecState(container);
+}
+
+// Update add/remove button states based on current slot count
+function updateJoinSpecState(container) {
+    const slots = container.querySelectorAll('.spec-slot');
+    const count = slots.length;
+
+    // Disable remove when at minimum (2)
+    slots.forEach(slot => {
+        const btn = slot.querySelector('.btn-remove-spec');
+        if (btn) btn.disabled = count <= 2;
+    });
+
+    // Disable add when at maximum (5)
+    const addBtn = container.parentElement.querySelector('.btn-add-spec');
+    if (addBtn) addBtn.disabled = count >= 5;
 }
 
 // Load example spec into input section
@@ -132,23 +165,39 @@ async function loadExample(select) {
     }
 }
 
-// Load example for join page (copies to clipboard for pasting)
+// Load example for join page (switches to paste mode and adds a pre-filled textarea)
 async function loadJoinExample(select) {
     const exampleName = select.value;
     if (!exampleName) return;
+
+    const section = select.closest('.input-section');
+    if (!section) return;
 
     try {
         const response = await fetch(`/api/examples/${exampleName}`);
         if (!response.ok) throw new Error(`Failed to load: ${response.statusText}`);
         const content = await response.text();
 
-        await navigator.clipboard.writeText(content);
-        alert(`${select.options[select.selectedIndex].text} copied to clipboard. Paste it into one of the spec inputs.`);
+        // Switch to paste mode
+        switchInputMode(section, 'paste');
+
+        // Find the paste container
+        const container = section.querySelector('.specs-paste-container');
+        if (!container) return;
+
+        // Check if there's an empty textarea we can fill first
+        const emptyTextarea = Array.from(container.querySelectorAll('textarea')).find(ta => !ta.value.trim());
+        if (emptyTextarea) {
+            emptyTextarea.value = content;
+        } else {
+            // Add a new spec slot with the content
+            addJoinSpec(container, content);
+        }
 
         select.value = '';
     } catch (error) {
         console.error('Failed to load example:', error);
-        alert('Failed to load example.');
+        alert('Failed to load example. Please try again.');
         select.value = '';
     }
 }
