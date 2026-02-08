@@ -107,40 +107,12 @@
     <div id="result"></div>
 
     <details class="usage-docs">
-        <summary>Usage Examples</summary>
+        <summary>How it's done</summary>
         <div class="docs-content">
-            <h4>Go Library</h4>
-            <pre><code class="language-go">import "github.com/erraggy/oastools/fixer"
-
-// Apply all fixes
-result, err := fixer.Fix("openapi.yaml")
-
-// Select specific fixes
-result, err := fixer.FixWithOptions(
-    fixer.WithFilePath("openapi.yaml"),
-    fixer.WithEnabledFixes(
-        fixer.FixTypeMissingPathParameter,
-        fixer.FixTypePrunedUnusedSchema,
-        fixer.FixTypeStubMissingRef,
-    ),
-)
-
-fmt.Printf("Applied %d fixes\n", len(result.Fixes))</code></pre>
-
-            <h4>CLI</h4>
-            <pre><code class="language-bash"># Apply all fixes
-oastools fix openapi.yaml
-
-# Select specific fixes
-oastools fix --missing-params --unused-schemas openapi.yaml
-
-# Dry run (preview changes)
-oastools fix --dry-run openapi.yaml
-
-# Output to file
-oastools fix openapi.yaml -o fixed.yaml</code></pre>
-
-            <p>
+            {{with emgithubURL "internal/api/fix.go"}}
+            <script src="{{.}}"></script>
+            {{end}}
+            <p class="docs-links">
                 <a href="https://erraggy.github.io/oastools/packages/fixer/" target="_blank" rel="noopener">Full documentation</a>
                 · <a href="https://pkg.go.dev/github.com/erraggy/oastools/fixer" target="_blank" rel="noopener">pkg.go.dev</a>
             </p>

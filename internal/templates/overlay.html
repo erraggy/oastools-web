@@ -78,45 +78,12 @@
     <div id="result"></div>
 
     <details class="usage-docs">
-        <summary>Usage Examples</summary>
+        <summary>How it's done</summary>
         <div class="docs-content">
-            <h4>Go Library</h4>
-            <pre><code class="language-go">import "github.com/erraggy/oastools/overlay"
-
-// Apply overlay to specification
-result, err := overlay.Apply("openapi.yaml", "overlay.yaml")
-
-// From parsed documents
-specDoc, _ := parser.Parse("openapi.yaml")
-overlayDoc, _ := overlay.ParseOverlayFile("overlay.yaml")
-result, err := overlay.ApplyParsed(specDoc, overlayDoc)
-
-fmt.Printf("Applied %d actions\n", len(result.AppliedActions))</code></pre>
-
-            <h4>CLI</h4>
-            <pre><code class="language-bash"># Apply overlay
-oastools overlay openapi.yaml overlay.yaml
-
-# Output to file
-oastools overlay openapi.yaml overlay.yaml -o modified.yaml
-
-# Multiple overlays (applied in order)
-oastools overlay openapi.yaml overlay1.yaml overlay2.yaml</code></pre>
-
-            <h4>Overlay Format</h4>
-            <pre><code class="language-yaml">overlay: 1.0.0
-info:
-  title: My Overlay
-  version: 1.0.0
-actions:
-  - target: $.info.title
-    update:
-      title: Updated API Title
-  - target: $.paths['/users'].get
-    update:
-      summary: Get all users</code></pre>
-
-            <p>
+            {{with emgithubURL "internal/api/overlay.go"}}
+            <script src="{{.}}"></script>
+            {{end}}
+            <p class="docs-links">
                 <a href="https://erraggy.github.io/oastools/packages/overlay/" target="_blank" rel="noopener">Full documentation</a>
                 · <a href="https://pkg.go.dev/github.com/erraggy/oastools/overlay" target="_blank" rel="noopener">pkg.go.dev</a>
             </p>
