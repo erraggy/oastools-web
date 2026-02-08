@@ -77,7 +77,7 @@ func (h *Handler) readFileInputWithLimit(r *http.Request, fieldName string, maxS
 	}
 	defer func() { _ = file.Close() }()
 
-	content, err := io.ReadAll(file)
+	content, err := io.ReadAll(io.LimitReader(file, maxSize+1))
 	if err != nil {
 		return nil, h.renderError(r, http.StatusBadRequest, "READ_FAILED",
 			fmt.Sprintf("failed to read %s file: %v", fieldName, err))
@@ -88,7 +88,6 @@ func (h *Handler) readFileInputWithLimit(r *http.Request, fieldName string, maxS
 			fmt.Sprintf("%s file is empty", fieldName))
 	}
 
-	// Check size limit
 	if int64(len(content)) > maxSize {
 		return nil, h.renderError(r, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE",
 			fmt.Sprintf("file exceeds maximum size of %d bytes", maxSize))
@@ -166,6 +165,9 @@ func (h *Handler) readMultipleInputs(r *http.Request, fieldName string, maxSize 
 		return h.readMultipleFileInputs(r, fieldName, maxSize, minCount, maxCount)
 	case inputModePaste:
 		return h.readMultiplePasteInputs(r, fieldName, maxSize, minCount, maxCount)
+	case inputModeURL:
+		return nil, h.renderError(r, http.StatusBadRequest, "UNSUPPORTED_MODE",
+			"URL mode is not supported for multiple inputs")
 	default:
 		return nil, h.renderError(r, http.StatusBadRequest, "INVALID_MODE",
 			fmt.Sprintf("invalid input mode: %s", mode))
@@ -197,7 +199,7 @@ func (h *Handler) readMultipleFileInputs(r *http.Request, fieldName string, maxS
 				fmt.Sprintf("failed to open file %s: %v", fileHeader.Filename, err))
 		}
 
-		content, err := io.ReadAll(file)
+		content, err := io.ReadAll(io.LimitReader(file, maxSize+1))
 		_ = file.Close()
 		if err != nil {
 			return nil, h.renderError(r, http.StatusBadRequest, "READ_FAILED",

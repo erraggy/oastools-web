@@ -346,7 +346,7 @@ func TestHandler_readMultipleInputs_ModeDispatch(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid mode returns error", func(t *testing.T) {
+	t.Run("url mode returns unsupported error", func(t *testing.T) {
 		req := createFormRequest(t, map[string]string{
 			"input_mode": "url",
 		})
@@ -357,6 +357,20 @@ func TestHandler_readMultipleInputs_ModeDispatch(t *testing.T) {
 		_, errResp := h.readMultipleInputs(req, "specs", 1024, 2, 5)
 		if errResp == nil {
 			t.Fatal("expected error response for unsupported mode")
+		}
+	})
+
+	t.Run("invalid mode returns error", func(t *testing.T) {
+		req := createFormRequest(t, map[string]string{
+			"input_mode": "bogus",
+		})
+		if err := req.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		_, errResp := h.readMultipleInputs(req, "specs", 1024, 2, 5)
+		if errResp == nil {
+			t.Fatal("expected error response for invalid mode")
 		}
 	})
 }
