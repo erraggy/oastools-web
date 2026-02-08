@@ -122,40 +122,12 @@
     <div id="result"></div>
 
     <details class="usage-docs">
-        <summary>Usage Examples</summary>
+        <summary>How it's done</summary>
         <div class="docs-content">
-            <h4>Go Library</h4>
-            <pre><code class="language-go">import "github.com/erraggy/oastools/joiner"
-
-// Simple join
-result, err := joiner.Join("api1.yaml", "api2.yaml")
-
-// With options
-config := joiner.DefaultConfig()
-config.DefaultStrategy = joiner.StrategyRenameRight
-
-j := joiner.New(config)
-result, err := j.JoinFiles("api1.yaml", "api2.yaml", "api3.yaml")
-
-fmt.Printf("Merged %d specs, %d collisions\n",
-    len(result.Sources), result.CollisionCount)</code></pre>
-
-            <h4>CLI</h4>
-            <pre><code class="language-bash"># Basic join
-oastools join api1.yaml api2.yaml
-
-# With collision strategy
-oastools join --strategy rename api1.yaml api2.yaml api3.yaml
-
-# With overlays
-oastools join api1.yaml api2.yaml \
-    --pre-overlay pre.yaml \
-    --post-overlay post.yaml
-
-# Output to file
-oastools join api1.yaml api2.yaml -o merged.yaml</code></pre>
-
-            <p>
+            {{with emgithubURL "internal/api/join.go"}}
+            <script src="{{.}}"></script>
+            {{end}}
+            <p class="docs-links">
                 <a href="https://erraggy.github.io/oastools/packages/joiner/" target="_blank" rel="noopener">Full documentation</a>
                 · <a href="https://pkg.go.dev/github.com/erraggy/oastools/joiner" target="_blank" rel="noopener">pkg.go.dev</a>
             </p>

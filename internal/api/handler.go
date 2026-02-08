@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"sort"
 	"strings"
@@ -39,13 +40,7 @@ type Handler struct {
 
 // NewHandler creates a new Handler with the given configuration.
 func NewHandler(cfg *config.Config, version string) (*Handler, error) {
-	// Parse base template
-	base, err := template.ParseFS(templates.FS, "base.html")
-	if err != nil {
-		return nil, fmt.Errorf("parse base template: %w", err)
-	}
-
-	// Template functions for partials
+	// Template functions shared by base, pages, and partials
 	funcMap := template.FuncMap{
 		// schemaName extracts the schema name from a $ref path
 		// e.g., "#/components/schemas/Pet" -> "Pet"
@@ -101,6 +96,30 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 				return ""
 			}
 		},
+		// emgithubURL builds an emgithub embed script URL for a source file,
+		// pinned to the deployed version tag, falling back to main for non-release builds.
+		// Pass exactly 2 line numbers for a range (e.g., 109, 166); other counts are ignored.
+		"emgithubURL": func(filePath string, lines ...int) template.URL {
+			ref := strings.TrimSpace(version)
+			if ref == "" || ref == "dev" || strings.Contains(ref, "-") {
+				ref = "main"
+			}
+			ghURL := fmt.Sprintf("https://github.com/erraggy/oastools-web/blob/%s/%s", ref, filePath)
+			if len(lines) == 2 {
+				ghURL += fmt.Sprintf("#L%d-L%d", lines[0], lines[1])
+			}
+			//nolint:gosec // URL is constructed entirely from controlled build-time values, not user input.
+			return template.URL(fmt.Sprintf(
+				"https://emgithub.com/embed-v2.js?target=%s&style=github-dark&type=code&showBorder=on&showLineNumbers=on&showFilePath=on",
+				url.QueryEscape(ghURL),
+			))
+		},
+	}
+
+	// Parse base template with funcMap so clones inherit custom functions
+	base, err := template.New("base.html").Funcs(funcMap).ParseFS(templates.FS, "base.html")
+	if err != nil {
+		return nil, fmt.Errorf("parse base template: %w", err)
 	}
 
 	// Parse partials for result rendering with custom functions
@@ -196,6 +215,9 @@ func (h *Handler) buildMiddlewareChain() {
 	if h.cfg.MetricsEnabled {
 		handler = Metrics(h.instruments)(handler)
 	}
+
+	// Security headers (CSP, X-Content-Type-Options, etc.)
+	handler = SecurityHeaders(handler)
 
 	// Logging (outermost - logs everything including errors)
 	handler = Logging(handler)

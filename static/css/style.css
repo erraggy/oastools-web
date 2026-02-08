@@ -589,24 +589,11 @@ details.usage-docs[open] summary {
     padding: 1rem;
 }
 
-.docs-content h4 {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
-    margin: 1rem 0 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+.docs-content .emgithub-container {
+    overflow-x: auto;
 }
 
-.docs-content h4:first-child {
-    margin-top: 0;
-}
-
-.docs-content pre {
-    margin: 0 0 0.5rem;
-}
-
-.docs-content p {
+.docs-links {
     margin-top: 1rem;
     font-size: 0.875rem;
 }

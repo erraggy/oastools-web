@@ -99,36 +99,12 @@
     <div id="result"></div>
 
     <details class="usage-docs">
-        <summary>Usage Examples</summary>
+        <summary>How it's done</summary>
         <div class="docs-content">
-            <h4>Go Library</h4>
-            <pre><code class="language-go">import "github.com/erraggy/oastools/differ"
-
-// Simple diff
-result, err := differ.Diff("old.yaml", "new.yaml")
-
-// With breaking change detection
-result, err := differ.DiffWithOptions(
-    differ.WithFilePaths("old.yaml", "new.yaml"),
-    differ.WithMode(differ.ModeBreaking),
-    differ.WithIncludeInfo(true),
-)
-
-fmt.Printf("Breaking: %d, Warnings: %d\n",
-    result.BreakingCount, result.WarningCount)</code></pre>
-
-            <h4>CLI</h4>
-            <pre><code class="language-bash"># Basic diff
-oastools diff old.yaml new.yaml
-
-# Breaking changes only
-oastools diff --breaking old.yaml new.yaml
-
-# With URLs
-oastools diff https://api.example.com/v1/spec.yaml \
-    https://api.example.com/v2/spec.yaml</code></pre>
-
-            <p>
+            {{with emgithubURL "internal/api/diff.go"}}
+            <script src="{{.}}"></script>
+            {{end}}
+            <p class="docs-links">
                 <a href="https://erraggy.github.io/oastools/packages/differ/" target="_blank" rel="noopener">Full documentation</a>
                 · <a href="https://pkg.go.dev/github.com/erraggy/oastools/differ" target="_blank" rel="noopener">pkg.go.dev</a>
             </p>

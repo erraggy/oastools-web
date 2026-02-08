@@ -60,32 +60,13 @@
     </div>
 
     <details class="usage-docs">
-        <summary>Usage Examples</summary>
+        <summary>How it's done</summary>
         <div class="docs-content">
-            <h4>Go Library</h4>
-            <pre><code class="language-go">import (
-    "github.com/erraggy/oastools/parser"
-    "github.com/erraggy/oastools/walker"
-)
-
-// Parse the specification
-result, err := parser.ParseWithOptions(
-    parser.WithFilePath("openapi.yaml"),
-)
-
-// Collect and iterate operations
-ops, _ := walker.CollectOperations(result)
-for _, op := range ops.All {
-    fmt.Printf("%s %s\n", op.Method, op.PathTemplate)
-}
-
-// Collect and iterate schemas
-schemas, _ := walker.CollectSchemas(result)
-for _, s := range schemas.Components {
-    fmt.Printf("Schema: %s\n", s.Name)
-}</code></pre>
-
-            <p>
+            {{/* Line range covers the core parse + walker.Collect* block. Update when explore.go changes. */}}
+            {{with emgithubURL "internal/api/explore.go" 109 166}}
+            <script src="{{.}}"></script>
+            {{end}}
+            <p class="docs-links">
                 <a href="https://erraggy.github.io/oastools/packages/parser/" target="_blank" rel="noopener">Full documentation</a>
                 · <a href="https://pkg.go.dev/github.com/erraggy/oastools/parser" target="_blank" rel="noopener">pkg.go.dev</a>
             </p>

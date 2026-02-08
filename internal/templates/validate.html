@@ -77,35 +77,12 @@
     <div id="result"></div>
 
     <details class="usage-docs">
-        <summary>Usage Examples</summary>
+        <summary>How it's done</summary>
         <div class="docs-content">
-            <h4>Go Library</h4>
-            <pre><code class="language-go">import "github.com/erraggy/oastools/validator"
-
-// Simple validation
-result, err := validator.Validate("openapi.yaml")
-
-// With options
-result, err := validator.ValidateWithOptions(
-    validator.WithFilePath("openapi.yaml"),
-    validator.WithStrictMode(true),
-    validator.WithIncludeWarnings(true),
-)
-
-fmt.Printf("Valid: %t, Errors: %d, Warnings: %d\n",
-    result.Valid, result.ErrorCount, result.WarningCount)</code></pre>
-
-            <h4>CLI</h4>
-            <pre><code class="language-bash"># Basic validation
-oastools validate openapi.yaml
-
-# Strict mode (fail on warnings)
-oastools validate --strict openapi.yaml
-
-# Validate from URL
-oastools validate https://api.example.com/openapi.yaml</code></pre>
-
-            <p>
+            {{with emgithubURL "internal/api/validate.go"}}
+            <script src="{{.}}"></script>
+            {{end}}
+            <p class="docs-links">
                 <a href="https://erraggy.github.io/oastools/packages/validator/" target="_blank" rel="noopener">Full documentation</a>
                 · <a href="https://pkg.go.dev/github.com/erraggy/oastools/validator" target="_blank" rel="noopener">pkg.go.dev</a>
             </p>

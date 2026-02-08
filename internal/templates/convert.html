@@ -90,38 +90,12 @@
     <div id="result"></div>
 
     <details class="usage-docs">
-        <summary>Usage Examples</summary>
+        <summary>How it's done</summary>
         <div class="docs-content">
-            <h4>Go Library</h4>
-            <pre><code class="language-go">import "github.com/erraggy/oastools/converter"
-
-// Simple conversion
-result, err := converter.Convert("openapi.yaml", "3.1")
-
-// With overlays
-result, err := converter.ConvertWithOptions(
-    converter.WithFilePath("openapi.yaml"),
-    converter.WithTargetVersion("3.1"),
-    converter.WithPreConversionOverlayFile("pre-overlay.yaml"),
-    converter.WithPostConversionOverlayFile("post-overlay.yaml"),
-)
-
-fmt.Printf("Converted from %s to %s\n",
-    result.SourceVersion, result.TargetVersion)</code></pre>
-
-            <h4>CLI</h4>
-            <pre><code class="language-bash"># Basic conversion
-oastools convert openapi.yaml --target 3.1
-
-# With overlays
-oastools convert openapi.yaml --target 3.1 \
-    --pre-overlay pre.yaml \
-    --post-overlay post.yaml
-
-# Output to file
-oastools convert openapi.yaml --target 3.1 -o converted.yaml</code></pre>
-
-            <p>
+            {{with emgithubURL "internal/api/convert.go"}}
+            <script src="{{.}}"></script>
+            {{end}}
+            <p class="docs-links">
                 <a href="https://erraggy.github.io/oastools/packages/converter/" target="_blank" rel="noopener">Full documentation</a>
                 · <a href="https://pkg.go.dev/github.com/erraggy/oastools/converter" target="_blank" rel="noopener">pkg.go.dev</a>
             </p>
