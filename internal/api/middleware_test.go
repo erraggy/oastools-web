@@ -673,11 +673,28 @@ func TestSecurityHeaders(t *testing.T) {
 		t.Fatal("handler was not called")
 	}
 
+	// Check CSP directives individually so reordering doesn't break the test.
+	csp := rec.Header().Get("Content-Security-Policy")
+	for _, directive := range []string{
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com",
+		"style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com",
+		"img-src 'self' data:",
+		"connect-src 'self' https://raw.githubusercontent.com",
+		"frame-src 'none'",
+		"object-src 'none'",
+		"base-uri 'self'",
+	} {
+		if !strings.Contains(csp, directive) {
+			t.Errorf("CSP missing directive %q in %q", directive, csp)
+		}
+	}
+
+	// Check remaining security headers with exact match.
 	tests := []struct {
 		header string
 		want   string
 	}{
-		{"Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com; img-src 'self' data:; connect-src 'self' https://raw.githubusercontent.com; frame-src 'none'; object-src 'none'; base-uri 'self'"},
 		{"X-Content-Type-Options", "nosniff"},
 		{"X-Frame-Options", "DENY"},
 		{"Referrer-Policy", "strict-origin-when-cross-origin"},
