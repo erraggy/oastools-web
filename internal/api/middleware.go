@@ -257,13 +257,15 @@ func ConcurrencyLimiter(maxConcurrent int) func(http.Handler) http.Handler {
 // CSP restricts script/style sources to known CDNs and emgithub.com.
 // 'unsafe-inline' is required for the highlight.js init script in base.html
 // and for styles injected by emgithub embeds.
+// cdn.jsdelivr.net is needed because emgithub's embed script loads highlight.js
+// assets (theme CSS + line-numbers plugin) from there at runtime.
 func SecurityHeaders(next http.Handler) http.Handler {
 	csp := strings.Join([]string{
 		"default-src 'self'",
-		"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com",
-		"style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com",
+		"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com https://cdn.jsdelivr.net",
+		"style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com https://cdn.jsdelivr.net",
 		"img-src 'self' data:",
-		"connect-src 'self' https://raw.githubusercontent.com",
+		"connect-src 'self' https://raw.githubusercontent.com https://cdn.jsdelivr.net",
 		"frame-src 'none'",
 		"object-src 'none'",
 		"base-uri 'self'",
