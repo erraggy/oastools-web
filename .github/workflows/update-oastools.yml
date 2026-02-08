@@ -32,6 +32,10 @@ jobs:
             echo "Missing client_payload.version in repository_dispatch event" >&2
             exit 1
           fi
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "Invalid version format: $VERSION" >&2
+            exit 1
+          fi
           go get "github.com/erraggy/oastools@${VERSION}"
           go mod tidy
 
@@ -84,7 +88,8 @@ jobs:
 
       - name: Deploy via Cloud Build
         run: |
+          VERSION="${{ github.event.client_payload.version }}"
           gcloud builds submit \
             --config=cloudbuild.yaml \
             --region=us-central1 \
-            --substitutions=SHORT_SHA=$(git rev-parse --short HEAD)
+            --substitutions=SHORT_SHA=$(git rev-parse --short HEAD),_APP_VERSION="${VERSION}"
