@@ -72,7 +72,7 @@ jobs:
 
       - name: Sync to merged main
         run: |
-          git fetch origin main
+          git fetch origin main --tags
           git checkout main
           git reset --hard origin/main
 
@@ -88,8 +88,9 @@ jobs:
 
       - name: Deploy via Cloud Build
         run: |
-          VERSION="${{ github.event.client_payload.version }}"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          APP_VERSION=$(git describe --tags --always)
           gcloud builds submit \
             --config=cloudbuild.yaml \
             --region=us-central1 \
-            --substitutions=SHORT_SHA=$(git rev-parse --short HEAD),_APP_VERSION="${VERSION}"
+            --substitutions=SHORT_SHA="${SHORT_SHA}",_APP_VERSION="${APP_VERSION}"
