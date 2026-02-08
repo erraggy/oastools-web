@@ -95,8 +95,11 @@ function addJoinSpec(container, content) {
             <span class="spec-slot-label">Spec ${index}</span>
             <button type="button" class="btn-remove-spec" onclick="removeJoinSpec(this)">Remove</button>
         </div>
-        <textarea name="specs_content" rows="8" placeholder="Paste OpenAPI spec (JSON or YAML)...">${content || ''}</textarea>
+        <textarea name="specs_content" rows="8" placeholder="Paste OpenAPI spec (JSON or YAML)..."></textarea>
     `;
+    if (content) {
+        div.querySelector('textarea').value = content;
+    }
     container.appendChild(div);
     updateJoinSpecState(container);
 }
@@ -183,12 +186,17 @@ async function loadJoinExample(select) {
 
         // Find the paste container
         const container = section.querySelector('.specs-paste-container');
-        if (!container) return;
+        if (!container) {
+            console.error('Failed to find paste container for example loading');
+            return;
+        }
 
         // Check if there's an empty textarea we can fill first
         const emptyTextarea = Array.from(container.querySelectorAll('textarea')).find(ta => !ta.value.trim());
         if (emptyTextarea) {
             emptyTextarea.value = content;
+        } else if (container.querySelectorAll('.spec-slot').length >= 5) {
+            alert('Maximum 5 specs reached. Remove a spec before adding another example.');
         } else {
             // Add a new spec slot with the content
             addJoinSpec(container, content);

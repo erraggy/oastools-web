@@ -153,8 +153,9 @@ func (h *Handler) readURLInputWithLimit(r *http.Request, fieldName string, maxSi
 }
 
 // readMultipleInputs reads multiple spec inputs from file uploads or pasted content.
-// It checks input_mode to determine the source, validates count bounds, and per-item size.
-func (h *Handler) readMultipleInputs(r *http.Request, fieldName string, maxSize int64, minCount, maxCount int) ([]*InputSource, builder.Response) {
+// It checks input_mode to determine the source and delegates to mode-specific readers
+// that validate count bounds and per-item size. URL mode is not supported for multiple inputs.
+func (h *Handler) readMultipleInputs(r *http.Request, fieldName string, maxSize int64, minCount, maxCount int) ([]*InputSource, builder.Response) { //nolint:unparam // fieldName is parameterized for consistency with readInputWithLimit
 	mode := r.FormValue("input_mode")
 	if mode == "" {
 		mode = inputModeFile
@@ -173,6 +174,11 @@ func (h *Handler) readMultipleInputs(r *http.Request, fieldName string, maxSize 
 
 // readMultipleFileInputs reads multiple files from a multipart form field.
 func (h *Handler) readMultipleFileInputs(r *http.Request, fieldName string, maxSize int64, minCount, maxCount int) ([]*InputSource, builder.Response) {
+	if r.MultipartForm == nil {
+		return nil, h.renderError(r, http.StatusBadRequest, "FORM_NOT_PARSED",
+			"multipart form data is required")
+	}
+
 	files := r.MultipartForm.File[fieldName]
 	if len(files) < minCount {
 		return nil, h.renderError(r, http.StatusBadRequest, "INSUFFICIENT_FILES",
@@ -196,6 +202,11 @@ func (h *Handler) readMultipleFileInputs(r *http.Request, fieldName string, maxS
 		if err != nil {
 			return nil, h.renderError(r, http.StatusBadRequest, "READ_FAILED",
 				fmt.Sprintf("failed to read file %s: %v", fileHeader.Filename, err))
+		}
+
+		if len(content) == 0 {
+			return nil, h.renderError(r, http.StatusBadRequest, "EMPTY_FILE",
+				fmt.Sprintf("file %s is empty", fileHeader.Filename))
 		}
 
 		if int64(len(content)) > maxSize {

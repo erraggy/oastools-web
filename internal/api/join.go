@@ -91,6 +91,10 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 		config.SchemaStrategy = parseSchemaStrategy(ss)
 	}
 	if em := r.FormValue("equivalenceMode"); em != "" {
+		if !joiner.IsValidEquivalenceMode(em) {
+			return h.renderError(r, http.StatusBadRequest, "INVALID_EQUIVALENCE_MODE",
+				fmt.Sprintf("invalid equivalence mode: %s", em))
+		}
 		config.EquivalenceMode = em
 	} else if config.SchemaStrategy == joiner.StrategyDeduplicateEquivalent {
 		config.EquivalenceMode = string(joiner.EquivalenceModeDeep)
@@ -105,6 +109,7 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 	joinResult, err := j.JoinParsed(parseResults)
 	h.instruments.recordPackageDuration(r.Context(), "joiner", joinStart)
 	if err != nil {
+		slog.Warn("join operation failed", "error", err.Error())
 		return h.renderError(r, http.StatusUnprocessableEntity, "JOIN_FAILED",
 			formatJoinError(err))
 	}
@@ -154,8 +159,10 @@ func parseSchemaStrategy(s string) joiner.CollisionStrategy {
 }
 
 // formatJoinError rewrites joiner errors into user-friendly messages.
-// The joiner library produces CLI-oriented messages (e.g., "set --path-strategy to 'accept-left'")
-// that reference flags and internal strategy names. This translates them for the web UI.
+// For CollisionError instances, the joiner library produces CLI-oriented messages
+// (e.g., "set --path-strategy to 'accept-left'") that reference flags and internal
+// strategy names. This translates them for the web UI. Other error types pass
+// through with a generic prefix.
 func formatJoinError(err error) string {
 	var ce *joiner.CollisionError
 	if !errors.As(err, &ce) {
@@ -164,9 +171,10 @@ func formatJoinError(err error) string {
 
 	// Map internal strategy names to UI labels
 	strategyLabel := map[joiner.CollisionStrategy]string{
-		joiner.StrategyFailOnCollision: "Error",
-		joiner.StrategyAcceptLeft:      "First",
-		joiner.StrategyRenameRight:     "Rename",
+		joiner.StrategyFailOnCollision:       "Error",
+		joiner.StrategyAcceptLeft:            "First",
+		joiner.StrategyRenameRight:           "Rename",
+		joiner.StrategyDeduplicateEquivalent: "Deduplicate",
 	}
 
 	strategy := "Error"
