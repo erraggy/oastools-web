@@ -14,7 +14,7 @@ go.work.sum
 
 # Build artifacts
 bin/
-server
+/server
 
 # Node.js / Playwright
 node_modules/
