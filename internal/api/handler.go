@@ -97,14 +97,14 @@ func NewHandler(cfg *config.Config, version string) (*Handler, error) {
 			}
 		},
 		// emgithubURL builds an emgithub embed script URL for a source file,
-		// pinned to the deployed version tag. Returns empty for non-release builds.
+		// pinned to the deployed version tag, falling back to main for non-release builds.
 		// Pass exactly 2 line numbers for a range (e.g., 109, 166); other counts are ignored.
 		"emgithubURL": func(filePath string, lines ...int) template.URL {
-			v := strings.TrimSpace(version)
-			if v == "" || v == "dev" || strings.Contains(v, "-") {
-				return ""
+			ref := strings.TrimSpace(version)
+			if ref == "" || ref == "dev" || strings.Contains(ref, "-") {
+				ref = "main"
 			}
-			ghURL := fmt.Sprintf("https://github.com/erraggy/oastools-web/blob/%s/%s", v, filePath)
+			ghURL := fmt.Sprintf("https://github.com/erraggy/oastools-web/blob/%s/%s", ref, filePath)
 			if len(lines) == 2 {
 				ghURL += fmt.Sprintf("#L%d-L%d", lines[0], lines[1])
 			}
@@ -215,6 +215,9 @@ func (h *Handler) buildMiddlewareChain() {
 	if h.cfg.MetricsEnabled {
 		handler = Metrics(h.instruments)(handler)
 	}
+
+	// Security headers (CSP, X-Content-Type-Options, etc.)
+	handler = SecurityHeaders(handler)
 
 	// Logging (outermost - logs everything including errors)
 	handler = Logging(handler)

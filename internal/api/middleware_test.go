@@ -658,6 +658,40 @@ func TestStaticCache(t *testing.T) {
 }
 
 // =============================================================================
+// SecurityHeaders Tests
+// =============================================================================
+
+func TestSecurityHeaders(t *testing.T) {
+	handler, called := testHandler()
+	wrapped := SecurityHeaders(handler)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	wrapped.ServeHTTP(rec, req)
+
+	if !*called {
+		t.Fatal("handler was not called")
+	}
+
+	tests := []struct {
+		header string
+		want   string
+	}{
+		{"Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com; img-src 'self' data:; connect-src 'self' https://raw.githubusercontent.com; frame-src 'none'; object-src 'none'; base-uri 'self'"},
+		{"X-Content-Type-Options", "nosniff"},
+		{"X-Frame-Options", "DENY"},
+		{"Referrer-Policy", "strict-origin-when-cross-origin"},
+	}
+
+	for _, tt := range tests {
+		got := rec.Header().Get(tt.header)
+		if got != tt.want {
+			t.Errorf("%s = %q, want %q", tt.header, got, tt.want)
+		}
+	}
+}
+
+// =============================================================================
 // Logging and responseWriter Tests
 // =============================================================================
 

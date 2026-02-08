@@ -253,6 +253,31 @@ func ConcurrencyLimiter(maxConcurrent int) func(http.Handler) http.Handler {
 	}
 }
 
+// SecurityHeaders sets Content-Security-Policy and other security headers.
+// CSP restricts script/style sources to known CDNs and emgithub.com.
+// 'unsafe-inline' is required for the highlight.js init script in base.html
+// and for styles injected by emgithub embeds.
+func SecurityHeaders(next http.Handler) http.Handler {
+	csp := strings.Join([]string{
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com",
+		"style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com",
+		"img-src 'self' data:",
+		"connect-src 'self' https://raw.githubusercontent.com",
+		"frame-src 'none'",
+		"object-src 'none'",
+		"base-uri 'self'",
+	}, "; ")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", csp)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next.ServeHTTP(w, r)
+	})
+}
+
 // StaticCache wraps a handler to add Cache-Control headers for static assets.
 // Uses immutable caching since embedded files only change on deployment.
 func StaticCache(maxAge time.Duration) func(http.Handler) http.Handler {
