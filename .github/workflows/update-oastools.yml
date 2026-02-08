@@ -1,0 +1,90 @@
+# Automatically bumps the oastools dependency when a new release is published.
+# Triggered via repository_dispatch from the oastools release workflow.
+# Runs make check, creates a PR, admin-merges, and deploys via Cloud Build.
+
+name: Update oastools
+
+on:
+  repository_dispatch:
+    types: [oastools-release]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.OASTOOLS_WEB_PAT }}
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+
+      - name: Update oastools
+        run: |
+          VERSION="${{ github.event.client_payload.version }}"
+          if [[ -z "$VERSION" ]]; then
+            echo "Missing client_payload.version in repository_dispatch event" >&2
+            exit 1
+          fi
+          go get "github.com/erraggy/oastools@${VERSION}"
+          go mod tidy
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Install linters
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2
+          pip install yamllint
+
+      - run: make check
+
+      - name: Create and merge PR
+        env:
+          GH_TOKEN: ${{ secrets.OASTOOLS_WEB_PAT }}
+        run: |
+          VERSION="${{ github.event.client_payload.version }}"
+          BRANCH="chore/bump-oastools-${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add go.mod go.sum
+          git commit -m "chore: bump oastools to ${VERSION}"
+          git push -u origin "${BRANCH}"
+          gh pr create \
+            --title "chore: bump oastools to ${VERSION}" \
+            --body "Automated dependency update triggered by oastools ${VERSION} release."
+          gh pr merge --admin --squash
+
+      - name: Sync to merged main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+      - uses: google-github-actions/auth@v2
+        with:
+          # yamllint disable-line rule:line-length
+          workload_identity_provider: "projects/222514409878/locations/global/workloadIdentityPools/github-actions/providers/github"
+          service_account: "github-actions@oastools-web.iam.gserviceaccount.com"
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: oastools-web
+
+      - name: Deploy via Cloud Build
+        run: |
+          gcloud builds submit \
+            --config=cloudbuild.yaml \
+            --region=us-central1 \
+            --substitutions=SHORT_SHA=$(git rev-parse --short HEAD)
