@@ -73,7 +73,7 @@ jobs:
 
       - name: Sync to merged main
         run: |
-          git fetch origin main --tags
+          git fetch origin main
           git checkout main
           git reset --hard origin/main
 

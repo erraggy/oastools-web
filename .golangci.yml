@@ -53,6 +53,8 @@ linters:
         - G304  # File inclusion via variable - acceptable for parsers
         - G301  # Directory permissions 0755 - standard for tools
         - G306  # File permissions 0644 - standard for tools
+        # yamllint disable-line rule:line-length
+        - G706  # Log injection - false positive for slog structured logging (literal messages, tainted data in typed attributes)
     revive:
       rules:
         - name: exported

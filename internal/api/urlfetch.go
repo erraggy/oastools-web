@@ -241,7 +241,7 @@ func (f *URLFetcher) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 	req.Header.Set("Accept", "application/json, application/yaml, application/x-yaml, text/yaml, text/plain, */*")
 
 	// Perform request
-	resp, err := f.client.Do(req)
+	resp, err := f.client.Do(req) //nolint:gosec // G704 - intentional URL fetching with SSRF protections (host blocking, redirect checking)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
