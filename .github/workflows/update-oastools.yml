@@ -27,8 +27,9 @@ jobs:
           go-version: "1.25"
 
       - name: Update oastools
+        env:
+          VERSION: ${{ github.event.client_payload.version }}
         run: |
-          VERSION="${{ github.event.client_payload.version }}"
           if [[ -z "$VERSION" ]]; then
             echo "Missing client_payload.version in repository_dispatch event" >&2
             exit 1
@@ -57,8 +58,8 @@ jobs:
       - name: Create and merge PR
         env:
           GH_TOKEN: ${{ secrets.OASTOOLS_WEB_PAT }}
+          VERSION: ${{ github.event.client_payload.version }}
         run: |
-          VERSION="${{ github.event.client_payload.version }}"
           BRANCH="chore/bump-oastools-${VERSION}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
