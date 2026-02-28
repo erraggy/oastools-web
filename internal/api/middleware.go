@@ -264,6 +264,7 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		"default-src 'self'",
 		"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://emgithub.com https://cdn.jsdelivr.net",
 		"style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://emgithub.com https://cdn.jsdelivr.net",
+		"font-src 'self'",
 		"img-src 'self' data:",
 		"connect-src 'self' https://raw.githubusercontent.com https://cdn.jsdelivr.net",
 		"frame-src 'none'",

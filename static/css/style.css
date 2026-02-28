@@ -1,27 +1,54 @@
+@font-face {
+    font-family: 'Plus Jakarta Sans';
+    font-style: normal;
+    font-weight: 600 800;
+    font-display: swap;
+    src: url('/static/fonts/plus-jakarta-sans-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+        U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+        U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
-    --color-bg: #fafafa;
+    --color-bg: #f8fafc;
     --color-surface: #fff;
     --color-text: #1a1a1a;
     --color-text-muted: #666;
-    --color-primary: #2563eb;
-    --color-primary-hover: #1d4ed8;
+    --color-primary: #0e7490;
+    --color-primary-hover: #155e75;
+    --color-primary-light: color-mix(in srgb, #0e7490 12%, transparent);
+    --color-primary-muted: color-mix(in srgb, #0e7490 6%, transparent);
     --color-border: #e5e7eb;
-    --color-success: #16a34a;
+    --color-success: #0e7490;
     --color-error: #dc2626;
     --color-warning: #d97706;
+    --color-info: #6366f1;
     --radius: 8px;
     --shadow: 0 1px 3px rgb(0 0 0 / 10%);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -4px rgb(0 0 0 / 10%);
+    --color-button: var(--color-primary);
+    --color-button-hover: var(--color-primary-hover);
+    --transition-base: 200ms ease;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --color-bg: #0a0a0a;
-        --color-surface: #171717;
-        --color-text: #fafafa;
-        --color-text-muted: #a3a3a3;
-        --color-primary: #3b82f6;
-        --color-primary-hover: #60a5fa;
-        --color-border: #262626;
+        --color-bg: #0f1720;
+        --color-surface: #1a2332;
+        --color-text: #f1f5f9;
+        --color-text-muted: #94a3b8;
+        --color-primary: #22d3ee;
+        --color-primary-hover: #67e8f9;
+        --color-primary-light: color-mix(in srgb, #22d3ee 15%, transparent);
+        --color-primary-muted: color-mix(in srgb, #22d3ee 8%, transparent);
+        --color-border: #2a3544;
+        --color-success: #22d3ee;
+        --color-info: #818cf8;
+        --color-error: #f87171;
+        --color-warning: #fbbf24;
+        --color-button: #0e7490;
+        --color-button-hover: #0891b2;
     }
 }
 
@@ -39,6 +66,10 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
 header {
@@ -86,6 +117,11 @@ nav {
     color: var(--color-text);
 }
 
+.nav-links a.active {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
 main {
     flex: 1;
     max-width: 1200px;
@@ -119,16 +155,24 @@ footer .version-info {
 }
 
 .hero-logo {
-    max-width: 100%;
-    width: 500px;
-    height: auto;
+    width: 250px;
+    height: 250px;
+    border-radius: 50%;
+    box-shadow: var(--shadow-lg);
     margin-bottom: 1.5rem;
 }
 
-.hero h1 {
+.hero-title {
     font-size: 2.5rem;
-    margin: 0;
-    line-height: 1;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-info));
+    /* stylelint-disable-next-line property-no-vendor-prefix -- Safari <14 needs -webkit- prefix for background-clip and text-fill-color */
+    -webkit-background-clip: text;
+    /* stylelint-disable-next-line property-no-vendor-prefix */
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: var(--color-primary);
 }
 
 .hero p {
@@ -146,9 +190,16 @@ footer .version-info {
 .card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-primary);
     border-radius: var(--radius);
     padding: 1.5rem;
     box-shadow: var(--shadow);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 .card h2 {
@@ -164,7 +215,7 @@ footer .version-info {
 
 .btn {
     display: inline-block;
-    background: var(--color-primary);
+    background: var(--color-button);
     color: white;
     padding: 0.5rem 1rem;
     border-radius: var(--radius);
@@ -177,7 +228,7 @@ footer .version-info {
 }
 
 .btn:hover {
-    background: var(--color-primary-hover);
+    background: var(--color-button-hover);
 }
 
 .btn:disabled {
@@ -237,9 +288,36 @@ footer .version-info {
 .result {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-primary);
     border-radius: var(--radius);
     padding: 1.5rem;
     margin-top: 1.5rem;
+    box-shadow: var(--shadow-md);
+    animation: fade-slide-in 0.3s ease;
+}
+
+@keyframes fade-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .result {
+        animation: none;
+    }
+
+    .card {
+        transition: none;
+    }
+
+    /* Spinner intentionally preserved — communicates loading state */
 }
 
 .result-header {
@@ -275,6 +353,16 @@ footer .version-info {
 .badge-warning {
     background: var(--color-warning);
     color: white;
+}
+
+.badge-info {
+    background: var(--color-info);
+    color: white;
+}
+
+.badge-small {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.6875rem;
 }
 
 /* Error messages */
@@ -1074,6 +1162,7 @@ small {
 .detail-card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-primary);
     border-radius: var(--radius);
     padding: 1.5rem;
 }
@@ -1506,3 +1595,250 @@ small {
     max-height: calc(100vh - 2rem);
     overflow-y: auto;
 }
+
+/* ── Issue severity indicators (icon + color differentiation) ── */
+.issue-error {
+    border-left: 3px solid var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 5%, transparent);
+    padding-left: 0.75rem;
+}
+
+.issue-error::before {
+    content: '\2717 ';
+    color: var(--color-error);
+    font-weight: 700;
+}
+
+.issue-warning {
+    border-left: 3px solid var(--color-warning);
+    background: color-mix(in srgb, var(--color-warning) 5%, transparent);
+    padding-left: 0.75rem;
+}
+
+.issue-warning::before {
+    content: '\26A0 ';
+    color: var(--color-warning);
+    font-weight: 700;
+}
+
+.issue-success {
+    border-left: 3px solid var(--color-success);
+    background: var(--color-primary-muted);
+    padding-left: 0.75rem;
+}
+
+.issue-success::before {
+    content: '\2713 ';
+    color: var(--color-success);
+    font-weight: 700;
+}
+
+.issue-info {
+    border-left: 3px solid var(--color-info);
+    background: color-mix(in srgb, var(--color-info) 5%, transparent);
+    padding-left: 0.75rem;
+}
+
+.issue-info::before {
+    content: '\2139 ';
+    color: var(--color-info);
+    font-weight: 700;
+}
+
+.issue-breaking {
+    border-left: 3px solid var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 5%, transparent);
+    padding-left: 0.75rem;
+}
+
+.issue-breaking::before {
+    content: '\203C ';
+    color: var(--color-error);
+    font-weight: 700;
+}
+
+/* ── Message callouts ─────────────────────────────────────── */
+.success-message {
+    border-left: 3px solid var(--color-success);
+    background: var(--color-primary-muted);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+}
+
+.success-message::before {
+    content: '\2713 ';
+    color: var(--color-success);
+    font-weight: 700;
+}
+
+.warning-message {
+    border-left: 3px solid var(--color-warning);
+    background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+}
+
+.warning-message::before {
+    content: '\26A0 ';
+    color: var(--color-warning);
+    font-weight: 700;
+}
+
+/* ── Stats section ────────────────────────────────────────── */
+.stats-section {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.stats-section h3 {
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, auto));
+    gap: 0.25rem 1.5rem;
+    font-size: 0.875rem;
+}
+
+.stats-grid dt {
+    color: var(--color-text-muted);
+}
+
+.stats-grid dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+.stat-breaking {
+    color: var(--color-error);
+    font-weight: 700;
+}
+
+.stat-warning {
+    color: var(--color-warning);
+    font-weight: 700;
+}
+
+.stat-info {
+    color: var(--color-info);
+    font-weight: 700;
+}
+
+/* ── Output section (fix/convert/join/overlay) ────────────── */
+.output-section {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.output-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.output-header h3 {
+    font-size: 0.875rem;
+}
+
+.output-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-small {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+}
+
+/* ── Issues section wrapper ───────────────────────────────── */
+.issues-section {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.issues-section h3 {
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+}
+
+/* ── Diff change rows ─────────────────────────────────────── */
+.change-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+}
+
+.change-type {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.change-type-added,
+.action-type-add {
+    background: var(--color-primary-light);
+    color: var(--color-success);
+}
+
+.change-type-removed,
+.action-type-remove {
+    background: color-mix(in srgb, var(--color-error) 12%, transparent);
+    color: var(--color-error);
+}
+
+.change-type-modified,
+.action-type-update {
+    background: color-mix(in srgb, var(--color-info) 12%, transparent);
+    color: var(--color-info);
+}
+
+.change-category {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+/* ── Fix / Overlay action badges ──────────────────────────── */
+.fix-type {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    margin-top: 0.25rem;
+}
+
+.action-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.action-type {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
