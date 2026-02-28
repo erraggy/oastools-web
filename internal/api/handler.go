@@ -248,6 +248,7 @@ func (h *Handler) servePage(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Version":         h.version,
 		"OastoolsVersion": h.oastoolsVersion,
+		"CurrentPath":     r.URL.Path,
 	}
 
 	var templateName string
