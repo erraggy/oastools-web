@@ -4,7 +4,7 @@ go 1.25.8
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0
-	github.com/erraggy/oastools v1.53.0
+	github.com/erraggy/oastools v1.53.1
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.40.0
 	go.opentelemetry.io/otel/metric v1.40.0
