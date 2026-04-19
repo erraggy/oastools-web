@@ -231,7 +231,7 @@ func (f *URLFetcher) Fetch(ctx context.Context, rawURL string) ([]byte, error) {
 	}
 
 	// Create request with context using normalized URL
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil) //nolint:gosec // G704 - intentional URL fetching with SSRF protections (host blocking, redirect checking)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
