@@ -38,7 +38,39 @@ jobs:
             echo "Invalid version format: $VERSION" >&2
             exit 1
           fi
-          go get "github.com/erraggy/oastools@${VERSION}"
+
+          # oastools dispatches this workflow immediately after its release
+          # workflow finishes, roughly two minutes after the tag is pushed.
+          # sum.golang.org has not indexed the new version by then and answers
+          # 500, so go get cannot verify the module. proxy.golang.org is already
+          # serving it; only the checksum database lags, by around four minutes
+          # on both v1.54.0 and v1.55.0.
+          #
+          # Retrying rather than sleeping a fixed amount: the lag is not
+          # reliably bounded, so a fixed wait either burns time on every release
+          # or still loses the race. Only the checksum-availability failure is
+          # retried — anything else fails immediately rather than spending ten
+          # minutes confirming a real error.
+          for attempt in 1 2 3 4 5 6; do
+            if out=$(go get "github.com/erraggy/oastools@${VERSION}" 2>&1); then
+              echo "$out"
+              break
+            fi
+            echo "$out"
+
+            if ! grep -qE 'sum\.golang\.org.*(500|502|503|504)|verifying module' <<<"$out"; then
+              echo "go get failed for a reason unrelated to checksum database availability" >&2
+              exit 1
+            fi
+            if [[ "$attempt" -eq 6 ]]; then
+              echo "sum.golang.org still had not indexed ${VERSION} after 6 attempts" >&2
+              exit 1
+            fi
+
+            echo "Checksum database has not indexed ${VERSION} yet (attempt ${attempt}/6); retrying in 90s"
+            sleep 90
+          done
+
           go mod tidy
 
       - uses: actions/setup-node@v6
