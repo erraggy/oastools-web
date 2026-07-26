@@ -11,7 +11,10 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The go get step below may wait out a checksum database lag of several
+    # minutes before the rest of this job -- linters, checks, PR merge, and a
+    # Cloud Build deploy -- even begins.
+    timeout-minutes: 25
     permissions:
       contents: read
       id-token: write
@@ -38,7 +41,50 @@ jobs:
             echo "Invalid version format: $VERSION" >&2
             exit 1
           fi
-          go get "github.com/erraggy/oastools@${VERSION}"
+
+          # oastools dispatches this workflow immediately after its release
+          # workflow finishes, roughly two minutes after the tag is pushed.
+          # sum.golang.org has not indexed the new version by then and answers
+          # 500, so go get cannot verify the module. proxy.golang.org is already
+          # serving it; only the checksum database lags, by around four minutes
+          # on both v1.54.0 and v1.55.0.
+          #
+          # Retrying rather than sleeping a fixed amount: the lag is not
+          # reliably bounded, so a fixed wait either burns time on every release
+          # or still loses the race.
+          #
+          # The pattern matches only a failed HTTP fetch of the checksum
+          # database. It deliberately does not match on "verifying module" or on
+          # sum.golang.org alone, because a checksum *mismatch* reports both --
+          # and a mismatch means the downloaded module disagrees with the signed
+          # record, which must fail on the first attempt rather than being
+          # retried. Anchoring on "reading https://" separates the two: a
+          # mismatch never reports an HTTP status.
+          #
+          # Five attempts at 60s covers the roughly four-minute lag measured on
+          # v1.54.0 and v1.55.0, with a worst case near nine minutes. Keep that
+          # inside the job's timeout-minutes with room for the deploy that
+          # follows.
+          for attempt in 1 2 3 4 5; do
+            if out=$(go get "github.com/erraggy/oastools@${VERSION}" 2>&1); then
+              echo "$out"
+              break
+            fi
+            echo "$out"
+
+            if ! grep -qE 'reading https://sum\.golang\.org/.*: (500|502|503|504) ' <<<"$out"; then
+              echo "go get failed for a reason other than checksum database availability" >&2
+              exit 1
+            fi
+            if [[ "$attempt" -eq 5 ]]; then
+              echo "sum.golang.org still had not indexed ${VERSION} after 5 attempts" >&2
+              exit 1
+            fi
+
+            echo "Checksum database has not indexed ${VERSION} yet (attempt ${attempt}/5); retrying in 60s"
+            sleep 60
+          done
+
           go mod tidy
 
       - uses: actions/setup-node@v6
