@@ -44,10 +44,15 @@ jobs:
 
           # oastools dispatches this workflow immediately after its release
           # workflow finishes, roughly two minutes after the tag is pushed.
-          # sum.golang.org has not indexed the new version by then and answers
-          # 500, so go get cannot verify the module. proxy.golang.org is already
-          # serving it; only the checksum database lags, by around four minutes
-          # on both v1.54.0 and v1.55.0.
+          # Neither proxy.golang.org nor sum.golang.org has indexed the new
+          # version by then, so go get cannot fetch or verify the module. On
+          # v1.54.0 and v1.55.0 this showed up as sum.golang.org answering
+          # 500-504 for a few minutes while proxy.golang.org already had the
+          # module. On v1.58.0, proxy.golang.org itself had not indexed the
+          # tag yet either (confirmed directly against
+          # proxy.golang.org/.../@v/<version>.info), which sum.golang.org
+          # reports as 404 rather than 5xx. Both are the same condition --
+          # "not indexed yet" -- so both are retried.
           #
           # Retrying rather than sleeping a fixed amount: the lag is not
           # reliably bounded, so a fixed wait either burns time on every release
@@ -61,27 +66,27 @@ jobs:
           # retried. Anchoring on "reading https://" separates the two: a
           # mismatch never reports an HTTP status.
           #
-          # Five attempts at 60s covers the roughly four-minute lag measured on
-          # v1.54.0 and v1.55.0, with a worst case near nine minutes. Keep that
-          # inside the job's timeout-minutes with room for the deploy that
-          # follows.
-          for attempt in 1 2 3 4 5; do
+          # Ten attempts at 60s covers the roughly four-minute lag measured on
+          # v1.54.0 and v1.55.0, plus headroom for the longer (10+ minute)
+          # proxy-indexing lag observed on v1.58.0. Keep that inside the job's
+          # timeout-minutes with room for the deploy that follows.
+          for attempt in $(seq 1 10); do
             if out=$(go get "github.com/erraggy/oastools@${VERSION}" 2>&1); then
               echo "$out"
               break
             fi
             echo "$out"
 
-            if ! grep -qE 'reading https://sum\.golang\.org/.*: (500|502|503|504) ' <<<"$out"; then
+            if ! grep -qE 'reading https://sum\.golang\.org/.*: (404|500|502|503|504) ' <<<"$out"; then
               echo "go get failed for a reason other than checksum database availability" >&2
               exit 1
             fi
-            if [[ "$attempt" -eq 5 ]]; then
-              echo "sum.golang.org still had not indexed ${VERSION} after 5 attempts" >&2
+            if [[ "$attempt" -eq 10 ]]; then
+              echo "sum.golang.org still had not indexed ${VERSION} after 10 attempts" >&2
               exit 1
             fi
 
-            echo "Checksum database has not indexed ${VERSION} yet (attempt ${attempt}/5); retrying in 60s"
+            echo "Checksum database has not indexed ${VERSION} yet (attempt ${attempt}/10); retrying in 60s"
             sleep 60
           done
 
