@@ -28,6 +28,12 @@ test:
 	go test -race -cover ./...
 .PHONY: test
 
+## update-golden: Updates Golden Files for tests
+update-golden:
+	@echo "Updating Golden Test Files..."
+	@go test ./internal/api/... --update-golden
+.phony: update-golden
+
 ## test-e2e: Run Playwright E2E tests
 test-e2e: build
 	@echo "Running E2E tests..."

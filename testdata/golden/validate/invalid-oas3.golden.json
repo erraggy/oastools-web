@@ -55,7 +55,7 @@
       "severity": "error"
     },
     {
-      "message": "oas 3.0.3: missing required field 'paths.items.get.responses': Operation must have a responses object",
+      "message": "oas 3.0.3: missing required field 'paths.items.get.responses': Operation must have a responses object (https://spec.openapis.org/oas/v3.0.0.html#operation-object)",
       "path": "document",
       "severity": "error"
     },
