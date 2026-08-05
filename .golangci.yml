@@ -36,6 +36,7 @@ linters:
         - "false"
         - "null"
         - "any"
+        - "first"
         - "string"
         - "integer"
         - "number"
@@ -48,6 +49,14 @@ linters:
         - "header"
         - "basic"
         - "bearer"
+        - "json"
+        - "yaml"
+        - "spec"
+        - "unknown"
+        - "rename"
+        - "error"
+        - "3.0.0"
+        - "petstore-3.0"
     gosec:
       excludes:
         - G304  # File inclusion via variable - acceptable for parsers
