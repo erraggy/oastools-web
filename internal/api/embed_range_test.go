@@ -58,10 +58,20 @@ func TestEmbedLineRangesCoverTheirBlock(t *testing.T) {
 				t.Fatalf("failed to read template: %v", err)
 			}
 
-			match := emgithubCall.FindStringSubmatch(string(tmpl))
-			if match == nil {
+			// All matches, not just the first: a template that grows a second
+			// ranged embed would otherwise have only its first one checked,
+			// and the new range would rot unnoticed — the very failure this
+			// test exists to prevent.
+			matches := emgithubCall.FindAllStringSubmatch(string(tmpl), -1)
+			if len(matches) == 0 {
 				t.Fatalf("no emgithubURL call with a line range found in %s", tt.template)
 			}
+			if len(matches) > 1 {
+				t.Fatalf("%s has %d ranged emgithubURL calls; this test checks one per template, so extend the table",
+					tt.template, len(matches))
+			}
+
+			match := matches[0]
 			if match[1] != tt.source {
 				t.Fatalf("embed references %s, want %s", match[1], tt.source)
 			}

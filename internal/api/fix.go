@@ -143,8 +143,12 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	allFixTypesRun := len(enabledFixes) == 0
 	if allFixTypesRun {
 		enabledFixes = []fixer.FixType{}
-	} else {
-		f.MutableInput = true // there's no need to copy the input document
+	} else if !dryRun {
+		// Ownership of the document is only ours to give away once the fixer is
+		// actually going to rewrite it. A dry run keeps the copy so the parsed
+		// input survives intact, which matters because not every fix type in
+		// the fixer honours DryRun.
+		f.MutableInput = true
 	}
 	f.EnabledFixes = enabledFixes
 
