@@ -82,7 +82,9 @@
                         <option value="first">First (keep first)</option>
                         <option value="rename">Rename (suffix duplicates)</option>
                         <option value="deduplicate">Deduplicate (merge identical)</option>
+                        <option value="dedupOrRename">Deduplicate or Rename (merge identical, rename the rest)</option>
                     </select>
+                    <small>&quot;Deduplicate or Rename&quot; merges schemas that are equivalent and falls back to renaming the ones that are not, instead of failing</small>
                 </div>
                 <div class="form-group">
                     <label for="equivalenceMode">Equivalence Mode</label>
@@ -94,11 +96,45 @@
                     <small>Depth of schema comparison for deduplication</small>
                 </div>
                 <div class="form-group">
+                    <label for="equivalenceDocs">Documentation in Comparison</label>
+                    <select id="equivalenceDocs" name="equivalenceDocs">
+                        <option value="" selected>Default (include)</option>
+                        <option value="include">Include (schemas differing only in prose stay separate)</option>
+                        <option value="ignore">Ignore (merge despite differing prose)</option>
+                    </select>
+                    <small>Whether title, description, and examples count when comparing schemas</small>
+                </div>
+                <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" name="semanticDedup">
                         Enable semantic deduplication
                     </label>
                     <small>Merge structurally identical schemas across documents</small>
+                </div>
+                <div class="form-group">
+                    <label for="dedupScope">Deduplication Scope</label>
+                    <select id="dedupScope" name="dedupScope">
+                        <option value="" selected>Default (all names)</option>
+                        <option value="all">All (fold any equivalent name)</option>
+                        <option value="generated-only">Generated only (fold just the names a rename invented)</option>
+                    </select>
+                    <small>Which schema names semantic deduplication may fold into another</small>
+                </div>
+                <div class="form-group">
+                    <label for="dedupMode">Deduplication Mode</label>
+                    <select id="dedupMode" name="dedupMode">
+                        <option value="" selected>Default (remove)</option>
+                        <option value="remove">Remove (delete folded names, rewrite every reference)</option>
+                        <option value="pointer">Pointer (keep folded names as a $ref to the survivor)</option>
+                    </select>
+                    <small>What becomes of a name once it is folded into an equivalent one</small>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="dedupReport">
+                        Report what deduplication consolidated
+                    </label>
+                    <small>List each surviving schema name and the names folded into it</small>
                 </div>
                 <div class="form-group">
                     <label for="preOverlay">Pre-join Overlay (optional)</label>
@@ -124,7 +160,8 @@
     <details class="usage-docs">
         <summary>How it's done</summary>
         <div class="docs-content">
-            {{with emgithubURL "internal/api/join.go"}}
+            {{/* Line range covers the joiner configuration + JoinParsed block. Update when join.go changes. */}}
+            {{with emgithubURL "internal/api/join.go" 103 161}}
             <script src="{{.}}"></script>
             {{end}}
             <p class="docs-links">

@@ -13,6 +13,24 @@
     </div>
     {{end}}
 
+    {{if .Consolidations}}
+    <div class="issues-section">
+        <h3>Consolidated Schemas ({{len .Consolidations}})</h3>
+        <ul class="issue-list">
+            {{range .Consolidations}}
+            <li class="issue-item issue-info">
+                <code class="issue-path">{{.Survivor}}</code>
+                {{if .SurvivorGenerated}}<span class="fix-type">generated name</span>{{end}}
+                <p class="issue-message">
+                    Absorbed {{len .Folded}} equivalent schema{{if ne (len .Folded) 1}}s{{end}}:
+                    {{range $i, $f := .Folded}}{{if $i}}, {{end}}<code>{{$f.Name}}</code>{{if $f.Pointer}} (kept as $ref){{else}} (removed){{end}}{{if $f.Generated}} (generated){{end}}{{end}}
+                </p>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+
     {{if .Warnings}}
     <div class="issues-section">
         <h3>Warnings ({{len .Warnings}})</h3>

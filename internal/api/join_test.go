@@ -19,6 +19,7 @@ func TestParseSchemaStrategy(t *testing.T) {
 		expected joiner.CollisionStrategy
 	}{
 		{name: "deduplicate", input: "deduplicate", expected: joiner.StrategyDeduplicateEquivalent},
+		{name: "dedupOrRename", input: "dedupOrRename", expected: joiner.StrategyDeduplicateOrRename},
 		{name: "rename delegates", input: "rename", expected: joiner.StrategyRenameRight},
 		{name: "first delegates", input: "first", expected: joiner.StrategyAcceptLeft},
 		{name: "error delegates", input: "error", expected: joiner.StrategyFailOnCollision},
@@ -114,6 +115,18 @@ func TestFormatJoinError(t *testing.T) {
 		}
 	})
 
+	t.Run("CollisionError with DeduplicateOrRename strategy", func(t *testing.T) {
+		err := &joiner.CollisionError{
+			Section:  "schemas",
+			Key:      "Order",
+			Strategy: joiner.StrategyDeduplicateOrRename,
+		}
+		msg := formatJoinError(err)
+		if !strings.Contains(msg, "Current strategy: Deduplicate or Rename") {
+			t.Errorf("expected strategy label 'Deduplicate or Rename', got: %s", msg)
+		}
+	})
+
 	t.Run("CollisionError with unmapped strategy falls back to Error", func(t *testing.T) {
 		err := &joiner.CollisionError{
 			Section:  "schemas",
@@ -123,6 +136,77 @@ func TestFormatJoinError(t *testing.T) {
 		msg := formatJoinError(err)
 		if !strings.Contains(msg, "Current strategy: Error") {
 			t.Errorf("expected fallback strategy label 'Error', got: %s", msg)
+		}
+	})
+}
+
+// =============================================================================
+// strategyComparesSchemas Tests
+// =============================================================================
+
+func TestStrategyComparesSchemas(t *testing.T) {
+	tests := []struct {
+		name     string
+		strategy joiner.CollisionStrategy
+		expected bool
+	}{
+		{name: "deduplicate equivalent compares", strategy: joiner.StrategyDeduplicateEquivalent, expected: true},
+		{name: "deduplicate or rename compares", strategy: joiner.StrategyDeduplicateOrRename, expected: true},
+		{name: "rename right does not", strategy: joiner.StrategyRenameRight, expected: false},
+		{name: "accept left does not", strategy: joiner.StrategyAcceptLeft, expected: false},
+		{name: "fail on collision does not", strategy: joiner.StrategyFailOnCollision, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := strategyComparesSchemas(tt.strategy); got != tt.expected {
+				t.Errorf("strategyComparesSchemas(%q) = %v, want %v", tt.strategy, got, tt.expected)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// buildConsolidations Tests
+// =============================================================================
+
+func TestBuildConsolidations(t *testing.T) {
+	t.Run("empty report yields nil", func(t *testing.T) {
+		if got := buildConsolidations(nil); got != nil {
+			t.Errorf("expected nil for an empty report, got: %#v", got)
+		}
+	})
+
+	t.Run("maps survivor and folded names", func(t *testing.T) {
+		got := buildConsolidations([]joiner.Consolidation{
+			{
+				Survivor:          "User",
+				SurvivorGenerated: false,
+				Folded: []joiner.FoldedName{
+					{Name: "User_api2", Generated: true, Pointer: false},
+					{Name: "Person", Generated: false, Pointer: true},
+				},
+			},
+		})
+
+		if len(got) != 1 {
+			t.Fatalf("expected 1 consolidation, got %d", len(got))
+		}
+		c := got[0]
+		if c.Survivor != "User" {
+			t.Errorf("Survivor = %q, want %q", c.Survivor, "User")
+		}
+		if c.SurvivorGenerated {
+			t.Error("SurvivorGenerated = true, want false")
+		}
+		if len(c.Folded) != 2 {
+			t.Fatalf("expected 2 folded names, got %d", len(c.Folded))
+		}
+		if c.Folded[0].Name != "User_api2" || !c.Folded[0].Generated || c.Folded[0].Pointer {
+			t.Errorf("unexpected first folded name: %#v", c.Folded[0])
+		}
+		if c.Folded[1].Name != "Person" || c.Folded[1].Generated || !c.Folded[1].Pointer {
+			t.Errorf("unexpected second folded name: %#v", c.Folded[1])
 		}
 	})
 }

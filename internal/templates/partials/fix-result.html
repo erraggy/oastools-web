@@ -7,6 +7,9 @@
         {{else}}
         <span class="badge badge-info">No fixes needed</span>
         {{end}}
+        {{if .RemainingIssues}}
+        <span class="badge badge-warning">{{len .RemainingIssues}} issue{{if ne (len .RemainingIssues) 1}}s{{end}} still present</span>
+        {{end}}
     </div>
 
     <p class="version-info">OpenAPI Version: <strong>{{.Version}}</strong></p>
@@ -26,6 +29,63 @@
     </div>
     {{else}}
     <p class="success-message">Your specification had no issues that required fixing.</p>
+    {{end}}
+
+    {{if .RemainingIssues}}
+    <div class="issues-section">
+        <h3>Still Present After Fixing ({{len .RemainingIssues}})</h3>
+        <p class="issue-message">
+            {{if .AllFixTypesRun}}
+            Every fix type ran and none of them resolved these, so they need editing by hand.
+            {{else}}
+            The fix types you selected did not resolve these. Another fix option may cover them &mdash; try again with more selected, or with none selected to run them all.
+            {{end}}
+        </p>
+        <ul class="issue-list">
+            {{range .RemainingIssues}}
+            <li class="issue-item issue-warning">
+                <p class="issue-message">{{.}}</p>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+
+    {{if .SubmittedIssues}}
+    <details class="parse-issues">
+        <summary>
+            Issues in the submitted document ({{len .SubmittedIssues}})
+            {{if .VerdictKnown}}
+              {{if .RemainingIssues}}
+              &mdash; {{len .RemainingIssues}} still present
+              {{else}}
+              &mdash; all resolved
+              {{end}}
+            {{else if .DryRun}}
+            &mdash; dry run, not re-checked
+            {{else}}
+            &mdash; could not be re-checked
+            {{end}}
+        </summary>
+        <div class="parse-issues-content">
+            <p class="issue-message">
+                {{if .VerdictKnown}}
+                This is what the parser found before fixing. Anything still present after fixing is listed above.
+                {{else if .DryRun}}
+                This is what the parser found in the submitted document. A dry run leaves it unchanged, so nothing could be re-checked.
+                {{else}}
+                This is what the parser found in the submitted document. The fixed output could not be re-parsed, so it could not be checked against this list.
+                {{end}}
+            </p>
+            <ul class="issue-list">
+                {{range .SubmittedIssues}}
+                <li class="issue-item issue-info">
+                    <p class="issue-message">{{.}}</p>
+                </li>
+                {{end}}
+            </ul>
+        </div>
+    </details>
     {{end}}
 
     <div class="output-section">

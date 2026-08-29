@@ -15,12 +15,33 @@ import (
 
 // JoinResponse represents the join result.
 type JoinResponse struct {
-	FileCount      int      `json:"fileCount"`
-	Version        string   `json:"version"`
-	CollisionCount int      `json:"collisionCount"`
-	Warnings       []string `json:"warnings"`
-	Result         string   `json:"result"`
-	Format         string   `json:"format"`
+	FileCount      int                 `json:"fileCount"`
+	Version        string              `json:"version"`
+	CollisionCount int                 `json:"collisionCount"`
+	Warnings       []string            `json:"warnings"`
+	Consolidations []ConsolidationInfo `json:"consolidations,omitempty"`
+	Result         string              `json:"result"`
+	Format         string              `json:"format"`
+}
+
+// ConsolidationInfo reports one group that semantic deduplication folded into a
+// single surviving schema name. Populated only when the deduplication report is
+// requested.
+type ConsolidationInfo struct {
+	Survivor          string       `json:"survivor"`
+	SurvivorGenerated bool         `json:"survivorGenerated"`
+	Folded            []FoldedInfo `json:"folded"`
+}
+
+// FoldedInfo is one name consolidated into a ConsolidationInfo's survivor.
+type FoldedInfo struct {
+	Name string `json:"name"`
+	// Generated reports whether a collision rename produced this name rather
+	// than a source document declaring it.
+	Generated bool `json:"generated"`
+	// Pointer reports whether the joined document still carries this name as a
+	// $ref to the survivor, rather than having removed it outright.
+	Pointer bool `json:"pointer"`
 }
 
 // maxJoinFileSize is the maximum size for each file in a join operation (1MB).
@@ -96,12 +117,37 @@ func (h *Handler) handleJoin(_ context.Context, req *builder.Request) builder.Re
 				fmt.Sprintf("invalid equivalence mode: %s", em))
 		}
 		config.EquivalenceMode = em
-	} else if config.SchemaStrategy == joiner.StrategyDeduplicateEquivalent {
+	} else if strategyComparesSchemas(config.SchemaStrategy) {
 		config.EquivalenceMode = string(joiner.EquivalenceModeDeep)
+	}
+	if ed := r.FormValue("equivalenceDocs"); ed != "" {
+		if !joiner.IsValidEquivalenceDocs(ed) {
+			return h.renderError(r, http.StatusBadRequest, "INVALID_EQUIVALENCE_DOCS",
+				fmt.Sprintf("invalid equivalence docs mode: %s", ed))
+		}
+		config.EquivalenceDocs = ed
 	}
 	if r.FormValue("semanticDedup") == "on" {
 		config.SemanticDeduplication = true
 	}
+	// Deduplication scope and mode refine what semantic deduplication does.
+	// Both have a zero value that reproduces the pre-scope/pre-mode behavior,
+	// so an unset form field deliberately leaves the config untouched.
+	if ds := r.FormValue("dedupScope"); ds != "" {
+		if !joiner.IsValidDeduplicationScope(ds) {
+			return h.renderError(r, http.StatusBadRequest, "INVALID_DEDUP_SCOPE",
+				fmt.Sprintf("invalid deduplication scope: %s", ds))
+		}
+		config.DeduplicationScope = joiner.DeduplicationScope(ds)
+	}
+	if dm := r.FormValue("dedupMode"); dm != "" {
+		if !joiner.IsValidDeduplicationMode(dm) {
+			return h.renderError(r, http.StatusBadRequest, "INVALID_DEDUP_MODE",
+				fmt.Sprintf("invalid deduplication mode: %s", dm))
+		}
+		config.DeduplicationMode = joiner.DeduplicationMode(dm)
+	}
+	config.DeduplicationReport = r.FormValue("dedupReport") == "on"
 
 	// Join using parse-once pattern
 	j := joiner.New(config)
@@ -150,12 +196,24 @@ func parseCollisionStrategy(s string) joiner.CollisionStrategy {
 }
 
 // parseSchemaStrategy maps form values to joiner strategies for schemas.
-// This extends parseCollisionStrategy with "deduplicate" which only applies to schemas.
+// This extends parseCollisionStrategy with the two strategies that only apply
+// to schemas, because only schemas can be compared for equivalence.
 func parseSchemaStrategy(s string) joiner.CollisionStrategy {
-	if s == "deduplicate" {
+	switch s {
+	case "deduplicate":
 		return joiner.StrategyDeduplicateEquivalent
+	case "dedupOrRename":
+		return joiner.StrategyDeduplicateOrRename
+	default:
+		return parseCollisionStrategy(s)
 	}
-	return parseCollisionStrategy(s)
+}
+
+// strategyComparesSchemas reports whether a schema strategy resolves collisions
+// by comparing schemas, and therefore needs an equivalence mode other than the
+// "none" that DefaultConfig supplies.
+func strategyComparesSchemas(s joiner.CollisionStrategy) bool {
+	return s == joiner.StrategyDeduplicateEquivalent || s == joiner.StrategyDeduplicateOrRename
 }
 
 // formatJoinError rewrites joiner errors into user-friendly messages.
@@ -175,6 +233,7 @@ func formatJoinError(err error) string {
 		joiner.StrategyAcceptLeft:            "First",
 		joiner.StrategyRenameRight:           "Rename",
 		joiner.StrategyDeduplicateEquivalent: "Deduplicate",
+		joiner.StrategyDeduplicateOrRename:   "Deduplicate or Rename",
 	}
 
 	strategy := "Error"
@@ -200,7 +259,35 @@ func (h *Handler) buildJoinResponse(parseResults []parser.ParseResult, joinResul
 		Version:        version,
 		CollisionCount: joinResult.CollisionCount,
 		Warnings:       joinResult.Warnings,
+		Consolidations: buildConsolidations(joinResult.Consolidations),
 		Result:         output,
 		Format:         format,
 	}
+}
+
+// buildConsolidations converts the joiner's deduplication report into the
+// response shape. It returns nil when nothing was consolidated, so the field
+// stays out of the JSON response entirely.
+func buildConsolidations(consolidations []joiner.Consolidation) []ConsolidationInfo {
+	if len(consolidations) == 0 {
+		return nil
+	}
+
+	out := make([]ConsolidationInfo, 0, len(consolidations))
+	for _, c := range consolidations {
+		folded := make([]FoldedInfo, 0, len(c.Folded))
+		for _, f := range c.Folded {
+			folded = append(folded, FoldedInfo{
+				Name:      f.Name,
+				Generated: f.Generated,
+				Pointer:   f.Pointer,
+			})
+		}
+		out = append(out, ConsolidationInfo{
+			Survivor:          c.Survivor,
+			SurvivorGenerated: c.SurvivorGenerated,
+			Folded:            folded,
+		})
+	}
+	return out
 }
