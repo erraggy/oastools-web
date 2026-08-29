@@ -143,14 +143,18 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	allFixTypesRun := len(enabledFixes) == 0
 	if allFixTypesRun {
 		enabledFixes = []fixer.FixType{}
-	} else if !dryRun {
-		// Ownership of the document is only ours to give away once the fixer is
-		// actually going to rewrite it. A dry run keeps the copy so the parsed
-		// input survives intact, which matters because not every fix type in
-		// the fixer honours DryRun.
-		f.MutableInput = true
 	}
 	f.EnabledFixes = enabledFixes
+
+	// Hand the document over rather than making the fixer copy it. Nothing
+	// reads parseResult.Document after FixParsed — the stats above are taken
+	// before it runs, and only parseResult.Version is read afterwards — so
+	// mutating it in place is safe whichever fix types were selected.
+	//
+	// A dry run keeps the copy. It should leave the submitted document intact,
+	// and it cannot rely on the fixer to arrange that: fixer/oas3.go, oas2.go
+	// and prune.go write unconditionally, without consulting DryRun.
+	f.MutableInput = !dryRun
 
 	// Fix using parse-once pattern
 	fixStart := time.Now()
