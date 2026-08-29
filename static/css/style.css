@@ -614,6 +614,68 @@ details.advanced-options[open] summary {
     margin-bottom: 0;
 }
 
+/* Grouped options whose settings only apply when the group's toggle is on */
+fieldset.option-group {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem 0.25rem;
+    margin: 0 0 1rem;
+}
+
+fieldset.option-group legend {
+    padding: 0 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+}
+
+/* Parse issues (secondary to the applied fixes on the fix page) */
+details.parse-issues {
+    margin-top: 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+}
+
+details.parse-issues summary {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+details.parse-issues summary::-webkit-details-marker {
+    display: none;
+}
+
+details.parse-issues summary::after {
+    content: '\25BC';
+    font-size: 0.625rem;
+    transition: transform 0.2s;
+}
+
+details.parse-issues[open] summary::after {
+    transform: rotate(180deg);
+}
+
+details.parse-issues[open] summary {
+    border-bottom: 1px solid var(--color-border);
+}
+
+.parse-issues-content {
+    padding: 1rem;
+}
+
+.parse-issues-content .issue-list {
+    margin-bottom: 0;
+}
+
 /* Checkbox labels */
 .checkbox-label {
     display: flex;

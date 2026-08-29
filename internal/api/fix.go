@@ -16,8 +16,50 @@ import (
 type FixResponse struct {
 	Version string     `json:"version"`
 	Fixes   []FixEntry `json:"fixes"`
-	Result  string     `json:"result"`
-	Format  string     `json:"format"`
+	// SubmittedIssues are the problems the parser reported about the document
+	// that was submitted. They describe the input, so the fixes above may well
+	// have resolved some of them; RemainingIssues is what actually survived.
+	SubmittedIssues []string `json:"submittedIssues,omitempty"`
+	// RemainingIssues are the problems the fixed output still reports. This is
+	// the authoritative "what is still wrong" list.
+	RemainingIssues []string `json:"remainingIssues,omitempty"`
+	// NetIssueReduction is how many fewer problems the output reports than the
+	// submitted document did. It is a net figure, not a count of issues
+	// resolved: fixing one problem while introducing another nets to zero.
+	// Only a RemainingIssues of length zero proves every problem was resolved.
+	// Meaningful only when VerdictKnown is true.
+	NetIssueReduction int `json:"netIssueReduction"`
+	// VerdictKnown reports whether the output could be re-checked at all.
+	VerdictKnown bool `json:"verdictKnown"`
+	// DryRun reports that no verdict exists because nothing was applied, as
+	// opposed to the output being unparseable. Both leave VerdictKnown false
+	// and the page explains them differently.
+	DryRun bool `json:"dryRun"`
+	// AllFixTypesRun reports that every fix type was enabled. When false the
+	// user selected a subset, so a remaining issue may simply have no selected
+	// fix rather than no available one.
+	AllFixTypesRun bool   `json:"allFixTypesRun"`
+	Result         string `json:"result"`
+	Format         string `json:"format"`
+}
+
+// parseVerdict summarizes the parse errors of the submitted document against
+// those of the fixed output.
+//
+// It deliberately compares counts and reports the output's own issues, rather
+// than pairing each input error with an output one. Several parser messages
+// name the locations involved in whichever order the document's maps happened
+// to iterate, so one defect is described two ways across two parses of the same
+// bytes. Matching on message text therefore reports the input's phrasing as
+// resolved and the output's as newly introduced when nothing changed at all.
+type parseVerdict struct {
+	submitted []string
+	remaining []string
+	// netReduction is len(submitted)-len(remaining), floored at zero. It is a
+	// net figure: one issue resolved alongside one introduced nets to zero.
+	netReduction int
+	known        bool
+	dryRun       bool
 }
 
 // FixEntry represents a single applied fix.
@@ -73,6 +115,9 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	if r.FormValue("fixMissingParams") == "on" {
 		enabledFixes = append(enabledFixes, fixer.FixTypeMissingPathParameter)
 	}
+	if r.FormValue("fixPathParamsNotRequired") == "on" {
+		enabledFixes = append(enabledFixes, fixer.FixTypePathParameterNotRequired)
+	}
 	if r.FormValue("removeUnusedSchemas") == "on" {
 		enabledFixes = append(enabledFixes, fixer.FixTypePrunedUnusedSchema)
 	}
@@ -92,11 +137,24 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 		enabledFixes = append(enabledFixes, fixer.FixTypeStubMissingRef)
 	}
 
-	// If checkboxes selected, use only those fix types; otherwise nil enables all
-	if len(enabledFixes) > 0 {
-		f.EnabledFixes = enabledFixes
-		f.MutableInput = true // there's no need to copy the input document
+	// If checkboxes are selected, apply only those fix types. Otherwise apply
+	// every fix type: the fixer reads an empty slice as "all", whereas leaving
+	// EnabledFixes alone would silently apply only fixer.DefaultEnabledFixes().
+	allFixTypesRun := len(enabledFixes) == 0
+	if allFixTypesRun {
+		enabledFixes = []fixer.FixType{}
 	}
+	f.EnabledFixes = enabledFixes
+
+	// Hand the document over rather than making the fixer copy it. Nothing
+	// reads parseResult.Document after FixParsed — the stats above are taken
+	// before it runs, and only parseResult.Version is read afterwards — so
+	// mutating it in place is safe whichever fix types were selected.
+	//
+	// A dry run keeps the copy. It should leave the submitted document intact,
+	// and it cannot rely on the fixer to arrange that: fixer/oas3.go, oas2.go
+	// and prune.go write unconditionally, without consulting DryRun.
+	f.MutableInput = !dryRun
 
 	// Fix using parse-once pattern
 	fixStart := time.Now()
@@ -118,8 +176,13 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 			"failed to serialize fixed specification")
 	}
 
+	// Compare the submitted document's parse errors against the fixed output's,
+	// so the page can say which of them fixing actually resolved. A dry run
+	// leaves the document untouched, so it yields no verdict to report.
+	verdict := h.classifyParseErrors(r.Context(), fixResult.ParseErrors, output, dryRun)
+
 	// Build response
-	result := h.buildFixResponse(parseResult, fixResult, output, format)
+	result := h.buildFixResponse(parseResult, fixResult, output, format, verdict, allFixTypesRun)
 
 	// Content negotiation
 	if wantsHTML(r) {
@@ -129,7 +192,7 @@ func (h *Handler) handleFix(_ context.Context, req *builder.Request) builder.Res
 	return builder.JSON(http.StatusOK, result)
 }
 
-func (h *Handler) buildFixResponse(parseResult *parser.ParseResult, fixResult *fixer.FixResult, output, format string) FixResponse {
+func (h *Handler) buildFixResponse(parseResult *parser.ParseResult, fixResult *fixer.FixResult, output, format string, verdict parseVerdict, allFixTypesRun bool) FixResponse {
 	fixes := make([]FixEntry, 0, len(fixResult.Fixes))
 	for _, fix := range fixResult.Fixes {
 		fixes = append(fixes, FixEntry{
@@ -140,9 +203,80 @@ func (h *Handler) buildFixResponse(parseResult *parser.ParseResult, fixResult *f
 	}
 
 	return FixResponse{
-		Version: parseResult.Version,
-		Fixes:   fixes,
-		Result:  output,
-		Format:  format,
+		Version:           parseResult.Version,
+		Fixes:             fixes,
+		SubmittedIssues:   verdict.submitted,
+		RemainingIssues:   verdict.remaining,
+		NetIssueReduction: verdict.netReduction,
+		VerdictKnown:      verdict.known,
+		DryRun:            verdict.dryRun,
+		AllFixTypesRun:    allFixTypesRun,
+		Result:            output,
+		Format:            format,
 	}
+}
+
+// classifyParseErrors summarizes what fixing resolved, by re-parsing the output
+// and comparing how many problems it still reports against how many the
+// submitted document had.
+//
+// It reports no per-issue verdict on purpose. The parser names the locations in
+// several of its messages in map-iteration order, so the same defect is phrased
+// two ways across two parses; pairing input messages against output ones then
+// flaps between "resolved" and "newly introduced" for a document that never
+// changed. Counts are stable under that reordering, and the output's own issue
+// list is accurate for the document actually produced.
+//
+// The verdict is left unknown when dryRun is set (the document was not
+// modified, so re-parsing would trivially report every input issue) or when the
+// output cannot be re-parsed. Callers then report the submitted issues alone,
+// and parseVerdict.dryRun tells the two cases apart so the page can say which
+// happened.
+func (h *Handler) classifyParseErrors(ctx context.Context, inputErrs []error, output string, dryRun bool) parseVerdict {
+	verdict := parseVerdict{submitted: messages(inputErrs), dryRun: dryRun}
+	if dryRun {
+		return verdict
+	}
+
+	remaining, ok := h.reparseErrors(ctx, output)
+	if !ok {
+		return verdict
+	}
+
+	verdict.remaining = remaining
+	verdict.known = true
+	// A net figure, floored at zero. Fixing can introduce an issue as well as
+	// clear one, so this understates rather than overstates what was resolved;
+	// an empty remaining list is the only proof that everything was resolved.
+	verdict.netReduction = max(len(verdict.submitted)-len(remaining), 0)
+
+	return verdict
+}
+
+// messages renders errors for display, preserving the order they were reported.
+func messages(errs []error) []string {
+	if len(errs) == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, len(errs))
+	for _, err := range errs {
+		out = append(out, err.Error())
+	}
+	return out
+}
+
+// reparseErrors parses the serialized output and returns the parse errors it
+// reports. The second result is false when the output could not be parsed at
+// all, leaving the comparison unavailable rather than wrong.
+func (h *Handler) reparseErrors(ctx context.Context, output string) ([]string, bool) {
+	start := time.Now()
+	result, err := parser.ParseWithOptions(parser.WithBytes([]byte(output)))
+	h.instruments.recordPackageDuration(ctx, "parser", start)
+	if err != nil || result == nil {
+		slog.Warn("could not re-parse fixed output to verify parse errors", "error", err)
+		return nil, false
+	}
+
+	return messages(result.Errors), true
 }

@@ -3,9 +3,15 @@
     <div class="result-header">
         <h2>Fix Result</h2>
         {{if .Fixes}}
-        <span class="badge badge-success">{{len .Fixes}} fixes applied</span>
+        <span class="badge badge-success">{{len .Fixes}} fix{{if ne (len .Fixes) 1}}es{{end}} {{if .DryRun}}found{{else}}applied{{end}}</span>
         {{else}}
         <span class="badge badge-info">No fixes needed</span>
+        {{end}}
+        {{if .DryRun}}
+        <span class="badge badge-warning">dry run</span>
+        {{end}}
+        {{if .RemainingIssues}}
+        <span class="badge badge-warning">{{len .RemainingIssues}} issue{{if ne (len .RemainingIssues) 1}}s{{end}} after fixing</span>
         {{end}}
     </div>
 
@@ -13,7 +19,7 @@
 
     {{if .Fixes}}
     <div class="issues-section">
-        <h3>Applied Fixes ({{len .Fixes}})</h3>
+        <h3>{{if .DryRun}}Fixes Found ({{len .Fixes}}){{else}}Applied Fixes ({{len .Fixes}}){{end}}</h3>
         <ul class="issue-list">
             {{range .Fixes}}
             <li class="issue-item issue-success">
@@ -28,14 +34,74 @@
     <p class="success-message">Your specification had no issues that required fixing.</p>
     {{end}}
 
+    {{if .RemainingIssues}}
+    <div class="issues-section">
+        <h3>Issues Detected After Fixing ({{len .RemainingIssues}})</h3>
+        <p class="issue-message">
+            {{if .AllFixTypesRun}}
+            Every fix type ran. These are the issues that the parser reports in the fixed output, so they may need editing by hand.
+            {{else}}
+            These are the issues that the parser reports in the fixed output. A fix type you did not select may cover them &mdash; try again with more selected, or with none selected to run them all.
+            {{end}}
+        </p>
+        <ul class="issue-list">
+            {{range .RemainingIssues}}
+            <li class="issue-item issue-warning">
+                <p class="issue-message">{{.}}</p>
+            </li>
+            {{end}}
+        </ul>
+    </div>
+    {{end}}
+
+    {{if .SubmittedIssues}}
+    <details class="parse-issues">
+        <summary>
+            Issues in the submitted document ({{len .SubmittedIssues}})
+            {{if .VerdictKnown}}
+              {{if .RemainingIssues}}
+              &mdash; {{len .RemainingIssues}} in the fixed output
+              {{else}}
+              &mdash; all resolved
+              {{end}}
+            {{else if .DryRun}}
+            &mdash; dry run, not re-checked
+            {{else}}
+            &mdash; could not be re-checked
+            {{end}}
+        </summary>
+        <div class="parse-issues-content">
+            <p class="issue-message">
+                {{if .VerdictKnown}}
+                This is what the parser found before fixing. What it reports in the fixed output is listed above.
+                {{else if .DryRun}}
+                This is what the parser found in the submitted document. A dry run is not re-checked against the output.
+                {{else}}
+                This is what the parser found in the submitted document. The fixed output could not be re-parsed, so it could not be checked against this list.
+                {{end}}
+            </p>
+            <ul class="issue-list">
+                {{range .SubmittedIssues}}
+                <li class="issue-item issue-info">
+                    <p class="issue-message">{{.}}</p>
+                </li>
+                {{end}}
+            </ul>
+        </div>
+    </details>
+    {{end}}
+
     <div class="output-section">
         <div class="output-header">
-            <h3>Fixed Specification</h3>
+            <h3>{{if .DryRun}}Preview Output{{else}}Fixed Specification{{end}}</h3>
             <div class="output-actions">
                 <button type="button" class="btn btn-small" onclick="copyToClipboard()">Copy</button>
                 <button type="button" class="btn btn-small" onclick="downloadSpec()">Download</button>
             </div>
         </div>
+        {{if .DryRun}}
+        <p class="issue-message">A dry run reports the fixes that would be applied, but oastools does not withhold every fix type from the document: some are already reflected below. Treat this as a preview, not as a copy of what you submitted.</p>
+        {{end}}
         <pre class="code-output"><code id="spec-output" class="language-{{.Format}}">{{.Result}}</code></pre>
     </div>
 </div>

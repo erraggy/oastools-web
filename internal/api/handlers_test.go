@@ -1115,3 +1115,175 @@ func TestHandler_ContentNegotiation(t *testing.T) {
 		})
 	}
 }
+
+// TestHandler_handleJoinNewOptions covers the joiner options added for oastools
+// v1.66.0 at the HTTP layer, where the unit tests for the helper functions do
+// not reach: each new field's rejection path, and a report that has to survive
+// the whole handler rather than being handed a pre-built joiner.Consolidation.
+func TestHandler_handleJoinNewOptions(t *testing.T) {
+	h := minimalHandler(t)
+
+	// Two documents that declare the same schema with the same shape, so a
+	// deduplicating strategy has something real to consolidate.
+	specA := `openapi: "3.0.3"
+info:
+  title: A
+  version: "1.0.0"
+paths:
+  /a:
+    get:
+      operationId: getA
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    Common:
+      type: object
+      properties:
+        id:
+          type: string
+`
+	specB := `openapi: "3.0.3"
+info:
+  title: B
+  version: "1.0.0"
+paths:
+  /b:
+    get:
+      operationId: getB
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    Other:
+      type: object
+      properties:
+        id:
+          type: string
+`
+
+	t.Run("rejects unknown values", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			field string
+			value string
+		}{
+			{name: "equivalence mode", field: "equivalenceMode", value: "sideways"},
+			{name: "equivalence docs", field: "equivalenceDocs", value: "maybe"},
+			{name: "deduplication scope", field: "dedupScope", value: "everything"},
+			{name: "deduplication mode", field: "dedupMode", value: "teleport"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := createMultiFileRequest(t, "/api/join", "specs",
+					[][]byte{[]byte(specA), []byte(specB)},
+					map[string]string{tt.field: tt.value})
+				if err := req.ParseMultipartForm(32 << 20); err != nil {
+					t.Fatalf("failed to parse form: %v", err)
+				}
+
+				resp := h.handleJoin(context.Background(), createHandlerRequest(req))
+
+				if resp.StatusCode() != http.StatusBadRequest {
+					t.Errorf("%s=%q got status %d, want %d",
+						tt.field, tt.value, resp.StatusCode(), http.StatusBadRequest)
+				}
+			})
+		}
+	})
+
+	t.Run("accepts every valid value", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			fields map[string]string
+		}{
+			{name: "equivalence docs include", fields: map[string]string{"equivalenceDocs": "include"}},
+			{name: "equivalence docs ignore", fields: map[string]string{"equivalenceDocs": "ignore"}},
+			{name: "scope all", fields: map[string]string{"dedupScope": "all"}},
+			{name: "scope generated-only", fields: map[string]string{"dedupScope": "generated-only"}},
+			{name: "mode remove", fields: map[string]string{"dedupMode": "remove"}},
+			{name: "mode pointer", fields: map[string]string{"dedupMode": "pointer"}},
+			{name: "deduplicate or rename strategy", fields: map[string]string{"schemaStrategy": "dedupOrRename"}},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				req := createMultiFileRequest(t, "/api/join", "specs",
+					[][]byte{[]byte(specA), []byte(specB)}, tt.fields)
+				if err := req.ParseMultipartForm(32 << 20); err != nil {
+					t.Fatalf("failed to parse form: %v", err)
+				}
+
+				resp := h.handleJoin(context.Background(), createHandlerRequest(req))
+
+				if resp.StatusCode() != http.StatusOK {
+					t.Errorf("got status %d, want %d", resp.StatusCode(), http.StatusOK)
+				}
+			})
+		}
+	})
+
+	t.Run("reports consolidations end to end", func(t *testing.T) {
+		// specB is rewritten to declare Common too, so the two collide and
+		// semantic deduplication has a group to fold and report.
+		collidingB := strings.Replace(specB, "Other:", "Common:", 1)
+
+		req := createMultiFileRequest(t, "/api/join", "specs",
+			[][]byte{[]byte(specA), []byte(collidingB)},
+			map[string]string{
+				"schemaStrategy":  "rename",
+				"semanticDedup":   "on",
+				"equivalenceMode": "deep",
+				"dedupReport":     "on",
+			})
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		resp := h.handleJoin(context.Background(), createHandlerRequest(req))
+		if resp.StatusCode() != http.StatusOK {
+			t.Fatalf("got status %d, want %d", resp.StatusCode(), http.StatusOK)
+		}
+
+		result, ok := resp.Body().(JoinResponse)
+		if !ok {
+			t.Fatalf("body is %T, want JoinResponse", resp.Body())
+		}
+		if len(result.Consolidations) == 0 {
+			t.Fatal("expected the deduplication report to reach the response, got none")
+		}
+		if result.Consolidations[0].Survivor == "" {
+			t.Error("consolidation has no surviving name")
+		}
+		if len(result.Consolidations[0].Folded) == 0 {
+			t.Error("consolidation folded nothing, which the library never reports")
+		}
+	})
+
+	t.Run("omits the report when it was not requested", func(t *testing.T) {
+		collidingB := strings.Replace(specB, "Other:", "Common:", 1)
+
+		req := createMultiFileRequest(t, "/api/join", "specs",
+			[][]byte{[]byte(specA), []byte(collidingB)},
+			map[string]string{
+				"schemaStrategy":  "rename",
+				"semanticDedup":   "on",
+				"equivalenceMode": "deep",
+			})
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
+
+		resp := h.handleJoin(context.Background(), createHandlerRequest(req))
+		result, ok := resp.Body().(JoinResponse)
+		if !ok {
+			t.Fatalf("body is %T, want JoinResponse", resp.Body())
+		}
+		if len(result.Consolidations) != 0 {
+			t.Errorf("Consolidations = %v, want none without dedupReport", result.Consolidations)
+		}
+	})
+}
