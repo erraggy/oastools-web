@@ -7,6 +7,11 @@ LOG_FILE := $(BUILD_DIR)/server.log
 # Build flags
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
+# Pinned linter version. This is the single source of truth: CI installs it via
+# the install-linter target, and the lint target refuses to run against any
+# other version, so local and CI cannot silently disagree about what passes.
+GOLANGCI_LINT_VERSION := v2.13.2
+
 # =============================================================================
 # Build Targets
 # =============================================================================
@@ -40,10 +45,26 @@ test-e2e: build
 	npm run test:e2e
 .PHONY: test-e2e
 
+## install-linter: Install the pinned golangci-lint version
+install-linter:
+	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+.PHONY: install-linter
+
 ## lint: Run golangci-lint
 lint:
 	@echo "Running Go linter..."
-	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed"; exit 1; }
+	@command -v golangci-lint >/dev/null 2>&1 || { \
+		echo "golangci-lint not installed. Run: make install-linter"; \
+		exit 1; \
+	}
+	@installed=$$(golangci-lint version 2>/dev/null | sed -n 's/.*has version v\{0,1\}\([0-9][^ ]*\).*/\1/p'); \
+	pinned=$$(printf '%s' "$(GOLANGCI_LINT_VERSION)" | sed 's/^v//'); \
+	if [ "$$installed" != "$$pinned" ]; then \
+		echo "golangci-lint version mismatch: installed $${installed:-unknown}, pinned $(GOLANGCI_LINT_VERSION)."; \
+		echo "CI lints with the pinned version, so results would not match. Run: make install-linter"; \
+		exit 1; \
+	fi
 	golangci-lint run ./...
 .PHONY: lint
 
