@@ -58,9 +58,10 @@ lint:
 		echo "golangci-lint not installed. Run: make install-linter"; \
 		exit 1; \
 	}
-	@installed=$$(golangci-lint version 2>/dev/null | sed -n 's/.*has version \([0-9][^ ]*\).*/v\1/p'); \
-	if [ "$$installed" != "$(GOLANGCI_LINT_VERSION)" ]; then \
-		echo "golangci-lint version mismatch: installed $$installed, pinned $(GOLANGCI_LINT_VERSION)."; \
+	@installed=$$(golangci-lint version 2>/dev/null | sed -n 's/.*has version v\{0,1\}\([0-9][^ ]*\).*/\1/p'); \
+	pinned=$$(printf '%s' "$(GOLANGCI_LINT_VERSION)" | sed 's/^v//'); \
+	if [ "$$installed" != "$$pinned" ]; then \
+		echo "golangci-lint version mismatch: installed $${installed:-unknown}, pinned $(GOLANGCI_LINT_VERSION)."; \
 		echo "CI lints with the pinned version, so results would not match. Run: make install-linter"; \
 		exit 1; \
 	fi
