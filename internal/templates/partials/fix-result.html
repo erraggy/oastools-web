@@ -8,7 +8,7 @@
         <span class="badge badge-info">No fixes needed</span>
         {{end}}
         {{if .RemainingIssues}}
-        <span class="badge badge-warning">{{len .RemainingIssues}} issue{{if ne (len .RemainingIssues) 1}}s{{end}} still present</span>
+        <span class="badge badge-warning">{{len .RemainingIssues}} issue{{if ne (len .RemainingIssues) 1}}s{{end}} after fixing</span>
         {{end}}
     </div>
 
@@ -33,12 +33,12 @@
 
     {{if .RemainingIssues}}
     <div class="issues-section">
-        <h3>Still Present After Fixing ({{len .RemainingIssues}})</h3>
+        <h3>Issues Detected After Fixing ({{len .RemainingIssues}})</h3>
         <p class="issue-message">
             {{if .AllFixTypesRun}}
-            Every fix type ran and none of them resolved these, so they need editing by hand.
+            Every fix type ran. These are what the parser reports in the fixed output, so they may need editing by hand.
             {{else}}
-            The fix types you selected did not resolve these. Another fix option may cover them &mdash; try again with more selected, or with none selected to run them all.
+            These are what the parser reports in the fixed output. A fix type you did not select may cover them &mdash; try again with more selected, or with none selected to run them all.
             {{end}}
         </p>
         <ul class="issue-list">
@@ -57,7 +57,7 @@
             Issues in the submitted document ({{len .SubmittedIssues}})
             {{if .VerdictKnown}}
               {{if .RemainingIssues}}
-              &mdash; {{len .RemainingIssues}} still present
+              &mdash; {{len .RemainingIssues}} in the fixed output
               {{else}}
               &mdash; all resolved
               {{end}}
@@ -70,7 +70,7 @@
         <div class="parse-issues-content">
             <p class="issue-message">
                 {{if .VerdictKnown}}
-                This is what the parser found before fixing. Anything still present after fixing is listed above.
+                This is what the parser found before fixing. What it reports in the fixed output is listed above.
                 {{else if .DryRun}}
                 This is what the parser found in the submitted document. A dry run leaves it unchanged, so nothing could be re-checked.
                 {{else}}
