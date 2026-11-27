@@ -1,10 +1,10 @@
 module github.com/erraggy/oastools-web
 
-go 1.26.7
+go 1.26.11
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0
-	github.com/erraggy/oastools v1.66.0
+	github.com/erraggy/oastools v1.67.0
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.46.0
 	go.opentelemetry.io/otel/metric v1.46.0
@@ -27,8 +27,8 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260825221802-da73d73af1c5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260825221802-da73d73af1c5 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
